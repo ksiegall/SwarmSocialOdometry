@@ -1,0 +1,77 @@
+
+include "vec2.bzz"
+
+# Some global variables
+NEST = [-2.5, -2.5]
+FOOD = [2.5, 2.5]
+signal_decay_rate = 0.5
+# First pair is weights when navigating to food
+# Second pair is weights when navigating to home
+priorities = [[0.7, 0.3], [0.3, 0.7]]
+collision_avoidance_coeff = 1
+distance_sensitivity_factor = 2.5
+
+food_recovered = 0
+
+# Executed once when the robot is spawned in the arena
+function init() {
+    dir_food = 0
+    P_food = 0
+    dir_home = 0
+    P_home = 0
+    # Decision making mode
+    # If no food, find food, if food, go home
+    has_food = 0
+    # How to represent incoming information from neighbors?
+    neighbor_list = []
+}
+
+# Executed once every time step
+function step() {
+    
+    # How to make list of actions?
+    # Could discretize velocity + twist?
+    var actions = []
+
+
+    # Update P_food and P_home based on neighbors
+    # also update predicted heading to food + home
+
+    # For each action:
+    #   Evaluate priorities[has_food][0]*P_food + priorities[has_food][1]*P_home 
+    #       - collision_avoidance_coeff*C_eval(action)
+    #   Maybe add a term where we weigh P_food/P_home by the resulting alignment of heading between us 
+    #       and the theoretical direction to those places? Might be better than the priorities? or maybe in addition to?
+    #   Save resulting weight
+    # Grab the argmax action, do it
+
+    # If home or food found (and that was what we were looking for)
+    # Set P_home or P_food to 1 and flip has_food
+    # and increment food_recovered
+    # food_recovered = food_recovered += 1
+
+    # broadcast P_food, P_home, dirs, current heading
+
+}
+
+function C_eval(action) {
+    # Sum the collision risk per neighbor to find the C_val of this action
+    sum_c = reduce(neighbor_list, function(n, accumulator) {
+        return math.exp(-distance(n, action)/(2*distance_sensitivity_factor^2)) + accumulator
+    })
+}
+
+function distance(neighbor, action) {
+    # Not entirely sure about the best implementation here
+    # could pull the real position of the robots to get the distance between them?
+    # the real goal is moreso to show how the distance between the two robots will *change* given this action
+    return 0
+}
+
+# Executed when you press the Reset button in the simulation window
+function reset() {
+}
+
+# Executed once when the robot is removed from the arena
+function destroy() {
+}
