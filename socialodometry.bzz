@@ -1,57 +1,117 @@
-
 include "vec2.bzz"
 
 # Some global variables
-NEST = [-2.5, -2.5]
-FOOD = [2.5, 2.5]
-signal_decay_rate = 0.5
+NEST = {.0 = -5, .1 = -5}
+FOOD = {.0 = 5, .1 = 5}
+signal_decay_rate = 0.2
 # First pair is weights when navigating to food
 # Second pair is weights when navigating to home
-priorities = [[0.7, 0.3], [0.3, 0.7]]
-collision_avoidance_coeff = 1
+priorities = { .0 = {.0 = 0.7, .1 = 0.3}, .1 = {.0=0.3, .1=0.7} }
+collision_avoidance_coeff = 0
 distance_sensitivity_factor = 2.5
 
+# tracking the performance of the robot
 food_recovered = 0
+
+# generate possible actions array around the circle
+actions_angle = {}
+num_divisions_angle = 20
+for (i = 0, i < num_divisions_angle, i = i + 1) {
+    actions_angle[i] = i * (360 / num_divisions_angle)
+}
 
 # Executed once when the robot is spawned in the arena
 function init() {
-    dir_food = 0
-    P_food = 0
-    dir_home = 0
-    P_home = 0
+    # dir_food = 0
+    # P_food = 0
+    # dir_home = 0
+    # P_home = 0
+    
+    state = {
+        .dir_food = 0,  # heading to food
+        .P_food = 0,    # weight of food signal (confidence)
+        .dir_home = 0,  # heading to home
+        .P_home = 0,    # weight of home signal (confidence)
+        .heading = 0   # current heading pulled from the odometry
+    }   
+    
     # Decision making mode
     # If no food, find food, if food, go home
     has_food = 0
     # How to represent incoming information from neighbors?
-    neighbor_list = []
+    neighbor_list = {}
+    neighbors.listen("/status", function(n){
+        neighbor_list.append(n)
+    })
 }
 
 # Executed once every time step
 function step() {
-    
-    # How to make list of actions?
-    # Could discretize velocity + twist?
-    var actions = []
-
 
     # Update P_food and P_home based on neighbors
-    # also update predicted heading to food + home
 
+    # Calculate the average P_food
+    neighbor_p_food = reduce(neighbor_list, function(key, n, accumulator){
+        return n.P_food + accumulator
+    }) / neighbor_list.length
+    # Calculate the weighted average of dir_food
+    neighbor_dir_food = reduce(neighbor_list, function(key, n, accumulator){
+        return n.P_food * n.dir_food + accumulator
+    }) / neighbor_list.length
+    # Calculate the average P_home
+    neighbor_p_home = reduce(neighbor_list, function(key, n, accumulator){
+        return n.P_home + accumulator
+    }) / neighbor_list.length
+    # Calculate the weighted average of dir_home
+    neighbor_dir_home = reduce(neighbor_list, function(key, n, accumulator){
+        return n.P_home * n.dir_home + accumulator
+    }) / neighbor_list.length
+    
+    # Update state using ourneighborus
+    state.P_food = (1-signal_decay_rate)*P_food + neighbor_p_food
+    state.dir_food = (P_food*dir_food + neighbor_p_food*neighbor_dir_food) / (P_food + neighbor_p_food)
+    state.P_home = (1-signal_decay_rate)*P_home + neighbor_p_home
+    state.dir_home = (P_home*dir_home + neighbor_p_home*neighbor_dir_home) / (P_home + neighbor_p_home)
+
+    state.heading = 0
+    
     # For each action:
-    #   Evaluate priorities[has_food][0]*P_food + priorities[has_food][1]*P_home 
-    #       - collision_avoidance_coeff*C_eval(action)
-    #   Maybe add a term where we weigh P_food/P_home by the resulting alignment of heading between us 
-    #       and the theoretical direction to those places? Might be better than the priorities? or maybe in addition to?
-    #   Save resulting weight
-    # Grab the argmax action, do it
+    action_values = {}
+    food_priority = priorities[has_food][0]*state.P_food
+    home_priority = priorities[has_food][1]*state.P_home 
 
+    foreach(actions_angle, function(key, action){
+        #   Evaluate priorities
+        action_val = food_priority*math.cosd(action - dir_food) + home_priority*math.cosd(action - dir_home)
+        #   Start without collision avoidance
+        # action_val = action_val - collision_avoidance_coeff*C_eval(action) 
+        #   Save resulting weight
+        action_values[action] = action_val
+    })
+    # Grab the argmax action, do it
+    desired_heading = argmax(action_values, function(a,b){return a>b})
+    
+    
+    
+    
     # If home or food found (and that was what we were looking for)
     # Set P_home or P_food to 1 and flip has_food
     # and increment food_recovered
     # food_recovered = food_recovered += 1
 
-    # broadcast P_food, P_home, dirs, current heading
 
+
+    
+    # broadcast P_food, P_home, dirs, current heading
+    neighbor.broadcast("/status", status)   
+     
+    if(has_food == 0){
+        # looking for food, blue LED
+        leds.setColor(80, 80, 255)
+    } else {
+        # looking for home, green LED
+        leds.setColor(80, 255, 80)
+		}
 }
 
 function C_eval(action) {
@@ -59,6 +119,32 @@ function C_eval(action) {
     sum_c = reduce(neighbor_list, function(n, accumulator) {
         return math.exp(-distance(n, action)/(2*distance_sensitivity_factor^2)) + accumulator
     })
+}
+
+function argmax(table, comparator) {
+    # Find the action with the maximum value
+    max_key = table[0]
+    max_value = table[max_key]
+    foreach(table, function(key, value) {
+        if (comparator(table[key], max_value)) {
+            max_value = table[key]
+            max_key = action
+        }
+    })
+    return max_key
+}
+
+function argmin(table) {
+    # Find the action with the minimum value
+    min_key = table[0]
+    min_value = table[min_key]
+    foreach(table, function(key, value) {
+        if (table[key] < min_value) {
+            min_value = table[key]
+            min_key = action
+        }
+    })
+    return min_key
 }
 
 function distance(neighbor, action) {
