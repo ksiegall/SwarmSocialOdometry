@@ -1,23 +1,28 @@
 include "vec2.bzz"
 
-# Some global variables
-NEST = {.0 = -5, .1 = -5}
-FOOD = {.0 = 5, .1 = 5}
-signal_decay_rate = 0.2
+# THESE TWO SHOULD REALLY BE RANDOMLY PLACED FROM THE C LOOP FUNCTIONS
+NEST = {.x = -5, .y = -5}
+FOOD = {.x = 5, .y = 5}
+
+
+NEST_FOOD_POSITION_TOLERANCE = 0.3
+SIGNAL_DECAY_RATE = 0.2
 # First pair is weights when navigating to food
 # Second pair is weights when navigating to home
 priorities = { .0 = {.0 = 0.7, .1 = 0.3}, .1 = {.0=0.3, .1=0.7} }
-collision_avoidance_coeff = 0
-distance_sensitivity_factor = 2.5
+COLLISION_AVOIDANCE_COEFF = 0
+DISTANCE_SENSITIVITY_FACTOR = 2.5
 
 # tracking the performance of the robot
 food_recovered = 0
 
+base_speed = 25
+
 # generate possible actions array around the circle
 actions_angle = {}
-num_divisions_angle = 20
-for (i = 0, i < num_divisions_angle, i = i + 1) {
-    actions_angle[i] = i * (360 / num_divisions_angle)
+NUM_ANGLE_DIVISIONS = 20
+for (i = 0, i < NUM_ANGLE_DIVISIONS, i = i + 1) {
+    actions_angle[i] = i * (2*math.pi / NUM_ANGLE_DIVISIONS)
 }
 
 # Executed once when the robot is spawned in the arena
@@ -39,9 +44,10 @@ function init() {
     # If no food, find food, if food, go home
     has_food = 0
     # How to represent incoming information from neighbors?
+    # TODO: UPDATE TO USE STYGMERGY
     neighbor_list = {}
-    neighbors.listen("/status", function(n){
-        neighbor_list.append(n)
+    neighbors.listen("/state", function(id, state){
+        neighbor_list.id = state
     })
 }
 
@@ -51,77 +57,94 @@ function step() {
     # Update P_food and P_home based on neighbors
 
     # Calculate the average P_food
-    neighbor_p_food = reduce(neighbor_list, function(key, n, accumulator){
-        return n.P_food + accumulator
-    }) / neighbor_list.length
+    var neighbor_p_food = reduce(neighbor_list, function(key, value, accumulator){
+        return value.P_food + accumulator
+    }, 0.0) / (size(neighbor_list) + 1)
     # Calculate the weighted average of dir_food
-    neighbor_dir_food = reduce(neighbor_list, function(key, n, accumulator){
-        return n.P_food * n.dir_food + accumulator
-    }) / neighbor_list.length
+    var neighbor_dir_food = reduce(neighbor_list, function(key, value, accumulator){
+        return value.P_food * value.dir_food + accumulator
+    }, 0.0) / (size(neighbor_list) + 1)
     # Calculate the average P_home
-    neighbor_p_home = reduce(neighbor_list, function(key, n, accumulator){
-        return n.P_home + accumulator
-    }) / neighbor_list.length
+    var neighbor_p_home = reduce(neighbor_list, function(key, value, accumulator){
+        return value.P_home + accumulator
+    }, 0.0) / (size(neighbor_list) + 1)
     # Calculate the weighted average of dir_home
-    neighbor_dir_home = reduce(neighbor_list, function(key, n, accumulator){
-        return n.P_home * n.dir_home + accumulator
-    }) / neighbor_list.length
+    var neighbor_dir_home = reduce(neighbor_list, function(key, value, accumulator){
+        return value.P_home * value.dir_home + accumulator
+    }, 0.0) / (size(neighbor_list) + 1)
     
     # Update state using ourneighborus
-    state.P_food = (1-signal_decay_rate)*P_food + neighbor_p_food
-    state.dir_food = (P_food*dir_food + neighbor_p_food*neighbor_dir_food) / (P_food + neighbor_p_food)
-    state.P_home = (1-signal_decay_rate)*P_home + neighbor_p_home
-    state.dir_home = (P_home*dir_home + neighbor_p_home*neighbor_dir_home) / (P_home + neighbor_p_home)
+    state.P_food = (1 - SIGNAL_DECAY_RATE) * state.P_food + neighbor_p_food
+    state.dir_food = (state.P_food * state.dir_food + neighbor_p_food * neighbor_dir_food) / (state.P_food + neighbor_p_food)
+    state.P_home = (1 - SIGNAL_DECAY_RATE) * state.P_home + neighbor_p_home
+    state.dir_home = (state.P_home * state.dir_home + neighbor_p_home * neighbor_dir_home) / (state.P_home + neighbor_p_home)
 
     state.heading = 0
     
     # For each action:
-    action_values = {}
-    food_priority = priorities[has_food][0]*state.P_food
-    home_priority = priorities[has_food][1]*state.P_home 
+    var action_values = {}
+    var food_priority = priorities[has_food][0]*state.P_food
+    var home_priority = priorities[has_food][1]*state.P_home 
 
     foreach(actions_angle, function(key, action){
         #   Evaluate priorities
-        action_val = food_priority*math.cosd(action - dir_food) + home_priority*math.cosd(action - dir_home)
+        action_val = food_priority*math.cos(action - state.dir_food) + home_priority*math.cos(action - state.dir_home)
         #   Start without collision avoidance
-        # action_val = action_val - collision_avoidance_coeff*C_eval(action) 
+        # action_val = action_val - COLLISION_AVOIDANCE_COEFF*C_eval(action) 
         #   Save resulting weight
         action_values[action] = action_val
     })
     # Grab the argmax action, do it
-    desired_heading = argmax(action_values, function(a,b){return a>b})
+    desired_heading = argmax(action_values)
     
-    
+    error = desired_heading - pose.orientation.yaw
+    var kp = 5
+    set_wheels(base_speed/(math.abs(error)+1) + kp*error, base_speed/(math.abs(error)+1) - kp*error)
     
     
     # If home or food found (and that was what we were looking for)
     # Set P_home or P_food to 1 and flip has_food
     # and increment food_recovered
     # food_recovered = food_recovered += 1
+    if(math.abs(pose.position.x - NEST.x) < NEST_FOOD_POSITION_TOLERANCE and math.abs(pose.position.y - NEST.y) < NEST_FOOD_POSITION_TOLERANCE) {
+        # Nest found
+        if(has_food) {
+            has_food = 0
+            food_recovered = food_recovered + 1
+        }
+    } else if(math.abs(pose.position.x - FOOD.x) < NEST_FOOD_POSITION_TOLERANCE and math.abs(pose.position.y - FOOD.y) < NEST_FOOD_POSITION_TOLERANCE) {
+        # Food found
+        has_food = 1
+    }
 
-
-
-    
     # broadcast P_food, P_home, dirs, current heading
-    neighbor.broadcast("/status", status)   
+    neighbors.broadcast("/state", state)   
      
     if(has_food == 0){
         # looking for food, blue LED
-        leds.setColor(80, 80, 255)
+        set_leds(80, 80, 255)
     } else {
         # looking for home, green LED
-        leds.setColor(80, 255, 80)
-		}
+       set_leds(80, 255, 80)
+    }
 }
 
 function C_eval(action) {
     # Sum the collision risk per neighbor to find the C_val of this action
     sum_c = reduce(neighbor_list, function(n, accumulator) {
-        return math.exp(-distance(n, action)/(2*distance_sensitivity_factor^2)) + accumulator
+        return math.exp(-distance(n, action)/(2*DISTANCE_SENSITIVITY_FACTOR^2)) + accumulator
     })
 }
 
-function argmax(table, comparator) {
+function argmax(table){
+    return arg_compare(table, function(a,b){return a>b})
+}
+
+function argmin(table){
+    return arg_compare(table, function(a,b){return a<b})
+}
+
+function arg_compare(table, comparator) {
     # Find the action with the maximum value
     max_key = table[0]
     max_value = table[max_key]
@@ -132,19 +155,6 @@ function argmax(table, comparator) {
         }
     })
     return max_key
-}
-
-function argmin(table) {
-    # Find the action with the minimum value
-    min_key = table[0]
-    min_value = table[min_key]
-    foreach(table, function(key, value) {
-        if (table[key] < min_value) {
-            min_value = table[key]
-            min_key = action
-        }
-    })
-    return min_key
 }
 
 function distance(neighbor, action) {

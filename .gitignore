@@ -1,0 +1,3 @@
+*.bdb
+*.bo
+build/*

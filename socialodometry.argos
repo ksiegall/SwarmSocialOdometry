@@ -76,6 +76,7 @@
       <sensors>
         <footbot_proximity implementation="default" show_rays="true" />
         <range_and_bearing implementation="medium" medium="rab" show_rays="true" noise_std_dev="0" />
+        <positioning implementation="default" />
       </sensors>
       <!--
           The <params> section is passed as-is to the controller's Init()
@@ -136,7 +137,7 @@
         standard deviation is 360 degrees.
     -->
     <distribute>
-      <position method="uniform" min="-5,-5,0" max="5,5,0" />
+      <position method="uniform" min="-4.8,-4.8,0" max="4.8,4.8,0" />
       <orientation method="gaussian" mean="0,0,0" std_dev="360,0,0" />
       <entity quantity="20" max_trials="100">
         <foot-bot id="fb" rab_data_size="100">
@@ -220,7 +221,7 @@
     <qt-opengl>
       <camera>
         <placements>
-          <placement index="0" position="0,0,8.14689" look_at="0,0,0" up="1,0,0" lens_focal_length="40" />
+          <placement index="0" position="0,0,10" look_at="0.5,0.5,0.5" up="1,0,0" lens_focal_length="40" />
         </placements>
       </camera>
       <user_functions label="buzz_qt" />
