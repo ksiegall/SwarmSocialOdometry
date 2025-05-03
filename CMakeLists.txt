@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8.0)
-project(RBE511_HW10)
+project(RBE511_FINAL)
 
 # Compile in Release by default
 if(CMAKE_BUILD_TYPE STREQUAL "")

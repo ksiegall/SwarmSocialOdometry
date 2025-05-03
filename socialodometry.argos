@@ -87,11 +87,33 @@
         <wheel_turning hard_turn_angle_threshold="90"
                        soft_turn_angle_threshold="70"
                        no_turn_angle_threshold="10"
-                       max_speed="10" />
+                       max_speed="12" />
       </params>
     </buzz_controller_footbot>
 
   </controllers>
+
+
+  <!-- ****************** -->
+  <!-- * Loop functions * -->
+  <!-- ****************** -->
+  <!--
+      Experiment configuration:
+      - outfile: the output file name
+      - tasks: parameter 'N_t' in the slides
+      - robots: parameter 'N_u' in the slides
+      - msg_size: max size of a message in bytes
+  -->
+      
+  <!-- <loop_functions library="build/libcbaa"
+                  label="cbaa"
+                  outfile="data.dat"
+                  tasks="3"
+                  robots="40"
+                  msg_size="300">
+
+  </loop_functions>   -->
+
 
   <!-- *********************** -->
   <!-- * Arena configuration * -->
@@ -114,18 +136,22 @@
   <arena size="25, 25, 1" center="0,0,0.5">x
 
     <!-- Place four boxes in a square to delimit the arena -->
-    <box id="wall_north" size="4,0.1,0.5" movable="false">
-      <body position="0,5,0" orientation="0,0,0" />
+    <box id="wall_north" size="25,0.1,0.5" movable="false">
+      <body position="0,12.5,0" orientation="0,0,0" />
     </box>
-    <box id="wall_south" size="4,0.1,0.5" movable="false">
-      <body position="0,-5,0" orientation="0,0,0" />
+    <box id="wall_south" size="25,0.1,0.5" movable="false">
+      <body position="0,-12.5,0" orientation="0,0,0" />
     </box>
-    <box id="wall_east" size="0.1,4,0.5" movable="false">
-      <body position="5,0,0" orientation="0,0,0" />
+    <box id="wall_east" size="0.1,25,0.5" movable="false">
+      <body position="12.5,0,0" orientation="0,0,0" />
     </box>
-    <box id="wall_west" size="0.1,4,0.5" movable="false">
-      <body position="-5,0,0" orientation="0,0,0" />
+    <box id="wall_west" size="0.1,25,0.5" movable="false">
+      <body position="-12.5,0,0" orientation="0,0,0" />
     </box>
+
+    <!-- <floor id="floor"
+    source="loop_functions"
+    pixels_per_meter="50" /> -->
 
     <!--
         You can distribute entities randomly. Here, we distribute
@@ -137,10 +163,10 @@
         standard deviation is 360 degrees.
     -->
     <distribute>
-      <position method="uniform" min="-4.8,-4.8,0" max="4.8,4.8,0" />
+      <position method="uniform" min="-12,-12,0" max="12,12,0" />
       <orientation method="gaussian" mean="0,0,0" std_dev="360,0,0" />
-      <entity quantity="20" max_trials="100">
-        <foot-bot id="fb" rab_data_size="100">
+      <entity quantity="40" max_trials="100">
+        <foot-bot id="fb" rab_data_size="250">
           <controller config="bfc" />
         </foot-bot>
       </entity>
@@ -221,7 +247,7 @@
     <qt-opengl>
       <camera>
         <placements>
-          <placement index="0" position="0,0,10" look_at="0.5,0.5,0.5" up="1,0,0" lens_focal_length="40" />
+          <placement index="0" position="0,0,10" look_at="0, 0, 0" up="1, 0, 0" lens_focal_length="10" />
         </placements>
       </camera>
       <user_functions label="buzz_qt" />

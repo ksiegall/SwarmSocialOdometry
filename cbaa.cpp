@@ -141,7 +141,7 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
    /* Create a new RNG */
    m_pcRNG = CRandom::CreateRNG("argos");
    /* Place the robots randomly in the center of the environment */
-   CRange<Real> cRobotRange(-0.5,0.5);
+   CRange<Real> cRobotRange(-12.0,12.0);
    for(size_t i = 0; i < nRobots; ++i) {
       /* Pick an orientation at random */
       CQuaternion cOrient;
@@ -212,6 +212,29 @@ void CCBAA::Reset() {
    for(size_t j = 0; j < m_vecTasks.size(); ++j)
       m_cOutFile << "\t" << "y_i" << j;
    m_cOutFile << std::endl;
+
+
+
+
+   // make the nests positions
+   // manually define the task nests position and food position vectors
+   nest_pair_one.resize(2);
+   nest_pair_two.resize(2);
+
+   CVector2 cPos;
+   // nest one
+   cPos.set(-5.0, -5.0);
+   nest_pair_one[0].position = cPos;
+   // food one
+   cPos.set(5.0, 5.0);
+   nest_pair_one[1].position = cPos;
+
+   // nest two
+   cPos.set(0.0, -5.0);
+   nest_pair_two[0].position = cPos;
+   cPos.set(0.0, 5.0);
+   nest_pair_two[1].position = cPos;
+
 }
 
 /****************************************/
@@ -224,15 +247,34 @@ void CCBAA::Destroy() {
 /****************************************/
 /****************************************/
 
-static Real TASK_RADIUS = .1;
+static Real TASK_RADIUS = 0.5;
 static Real TASK_RADIUS_2 = TASK_RADIUS * TASK_RADIUS;
 
+
 CColor CCBAA::GetFloorColor(const CVector2& c_position_on_plane) {
-   for(UInt32 i = 0; i < m_vecTasks.size(); ++i) {
-      if((c_position_on_plane - m_vecTasks[i].Position).SquareLength() < TASK_RADIUS_2) {
-         return CColor::BLACK;
-      }
+   // for(UInt32 i = 0; i < m_vecTasks.size(); ++i) {
+      //    if((c_position_on_plane - m_vecTasks[i].Position).SquareLength() < TASK_RADIUS_2) {
+         //       return CColor::BLACK;
+         //    }
+         // }
+      
+   // define the nest and food position vector
+   if((c_position_on_plane - nest_pair_one[0].position).SquareLength() < TASK_RADIUS_2) {
+      return CColor::PURPLE;
    }
+
+   if((c_position_on_plane - nest_pair_one[1].position).SquareLength() < TASK_RADIUS_2) {
+      return CColor::RED;
+   }
+  
+   // if((c_position_on_plane - nest_pair_two[0].position).SquareLength() < TASK_RADIUS_2) {
+   //    return CColor::GREEN;
+   // }
+
+   // if((c_position_on_plane - nest_pair_two[1].position).SquareLength() < TASK_RADIUS_2) {
+   //    return CColor::AQUA;
+   // }
+
    return CColor::WHITE;
 }
 

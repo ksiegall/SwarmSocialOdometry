@@ -72,6 +72,8 @@ private:
 
    /** Task data */
    std::vector<STask> m_vecTasks;
+   std::vector<STask> nest_pair_one;
+   std::vector<STask> nest_pair_two;
 
    /** The output file name */
    std::string m_strOutFile;

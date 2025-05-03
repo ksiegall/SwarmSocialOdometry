@@ -1,6 +1,7 @@
 include "vec2.bzz"
 
 # THESE TWO SHOULD REALLY BE RANDOMLY PLACED FROM THE C LOOP FUNCTIONS
+# also manually change it in the cbaa.cpp file, as it is hardcoded, because this argos/buzz combo is LITERAL HELL
 NEST = {.x = -5, .y = -5}
 FOOD = {.x = 5, .y = 5}
 
@@ -9,9 +10,13 @@ NEST_FOOD_POSITION_TOLERANCE = 0.3
 SIGNAL_DECAY_RATE = 0.2
 # First pair is weights when navigating to food
 # Second pair is weights when navigating to home
-priorities = { .0 = {.0 = 0.7, .1 = 0.3}, .1 = {.0=0.3, .1=0.7} }
+priorities = { .0 = {.0 = 0.6, .1 = 0.2, .2=0.2}, .1 = {.0=0.2, .1=0.7, .2=0.2} }
 COLLISION_AVOIDANCE_COEFF = 0
 DISTANCE_SENSITIVITY_FACTOR = 2.5
+
+# collision avoidance parameters
+ANGLE_THRESHOLD = math.pi / 2
+LENGTH_THRESHOLD = 0
 
 # tracking the performance of the robot
 food_recovered = 0
@@ -22,11 +27,12 @@ base_speed = 25
 actions_angle = {}
 NUM_ANGLE_DIVISIONS = 20
 for (i = 0, i < NUM_ANGLE_DIVISIONS, i = i + 1) {
-    actions_angle[i] = i * (2*math.pi / NUM_ANGLE_DIVISIONS)
+    actions_angle[i] = i * (2*math.pi / NUM_ANGLE_DIVISIONS) - math.pi
 }
 
 # Executed once when the robot is spawned in the arena
 function init() {
+    VALUE_OF_EXPLORATION = (id % NUM_ANGLE_DIVISIONS)
     # dir_food = 0
     # P_food = 0
     # dir_home = 0
@@ -51,6 +57,11 @@ function init() {
     })
 }
 
+### TODO:
+# - compile and make loop function visualize the food/nest pair positions
+# - Once food/nest is found, save current heading
+
+
 # Executed once every time step
 function step() {
 
@@ -59,25 +70,28 @@ function step() {
     # Calculate the average P_food
     var neighbor_p_food = reduce(neighbor_list, function(key, value, accumulator){
         return value.P_food + accumulator
-    }, 0.0) / (size(neighbor_list) + 1)
+    }, 0.0) / (size(neighbor_list) + 0.01)
+
     # Calculate the weighted average of dir_food
     var neighbor_dir_food = reduce(neighbor_list, function(key, value, accumulator){
         return value.P_food * value.dir_food + accumulator
-    }, 0.0) / (size(neighbor_list) + 1)
+    }, 0.0) / (size(neighbor_list) + 0.01)
+
     # Calculate the average P_home
     var neighbor_p_home = reduce(neighbor_list, function(key, value, accumulator){
         return value.P_home + accumulator
-    }, 0.0) / (size(neighbor_list) + 1)
+    }, 0.0) / (size(neighbor_list) + 0.01)
+    
     # Calculate the weighted average of dir_home
     var neighbor_dir_home = reduce(neighbor_list, function(key, value, accumulator){
         return value.P_home * value.dir_home + accumulator
-    }, 0.0) / (size(neighbor_list) + 1)
+    }, 0.0) / (size(neighbor_list) + 0.01)
     
     # Update state using ourneighborus
     state.P_food = (1 - SIGNAL_DECAY_RATE) * state.P_food + neighbor_p_food
-    state.dir_food = (state.P_food * state.dir_food + neighbor_p_food * neighbor_dir_food) / (state.P_food + neighbor_p_food)
+    state.dir_food = (state.P_food * state.dir_food + neighbor_p_food * neighbor_dir_food) / (state.P_food + neighbor_p_food + 0.01)
     state.P_home = (1 - SIGNAL_DECAY_RATE) * state.P_home + neighbor_p_home
-    state.dir_home = (state.P_home * state.dir_home + neighbor_p_home * neighbor_dir_home) / (state.P_home + neighbor_p_home)
+    state.dir_home = (state.P_home * state.dir_home + neighbor_p_home * neighbor_dir_home) / (state.P_home + neighbor_p_home + 0.01)
 
     state.heading = 0
     
@@ -85,21 +99,39 @@ function step() {
     var action_values = {}
     var food_priority = priorities[has_food][0]*state.P_food
     var home_priority = priorities[has_food][1]*state.P_home 
+    var explore_priority = priorities[has_food][2]
 
     foreach(actions_angle, function(key, action){
         #   Evaluate priorities
         action_val = food_priority*math.cos(action - state.dir_food) + home_priority*math.cos(action - state.dir_home)
+        # Each robot has its preferred exploration direction (based on its id)
+        action_val = action_val - explore_priority * math.abs(key - VALUE_OF_EXPLORATION) / NUM_ANGLE_DIVISIONS
         #   Start without collision avoidance
         # action_val = action_val - COLLISION_AVOIDANCE_COEFF*C_eval(action) 
         #   Save resulting weight
+        
+        # log("Action: ", action, " Value: ", action_val)
+        # action = heading
+        # action_val = score per heading
         action_values[action] = action_val
     })
+
+    if (close_to_wall()) {
+        VALUE_OF_EXPLORATION = ((VALUE_OF_EXPLORATION + 1) / 10) % NUM_ANGLE_DIVISIONS
+    }
+    
+    # foreach(action_values, function(action, value) {
+    #     log("Action: ", action, " Value: ", value)
+    # })
+
     # Grab the argmax action, do it
     desired_heading = argmax(action_values)
     
     error = desired_heading - pose.orientation.yaw
-    var kp = 5
-    set_wheels(base_speed/(math.abs(error)+1) + kp*error, base_speed/(math.abs(error)+1) - kp*error)
+    log("Error: ", error, " Desired heading: ", desired_heading, " Current heading: ", pose.orientation.yaw)
+    var kp = 3
+    # Slows down based on the curvature of the path
+    set_wheels(base_speed/(math.abs(error)+1) - kp*error, base_speed/(math.abs(error)+1) + kp*error)
     
     
     # If home or food found (and that was what we were looking for)
@@ -111,10 +143,16 @@ function step() {
         if(has_food) {
             has_food = 0
             food_recovered = food_recovered + 1
+            state.dir_home = pose.orientation.yaw
+            state.P_home = 1
         }
     } else if(math.abs(pose.position.x - FOOD.x) < NEST_FOOD_POSITION_TOLERANCE and math.abs(pose.position.y - FOOD.y) < NEST_FOOD_POSITION_TOLERANCE) {
         # Food found
-        has_food = 1
+        if(not has_food) {
+            has_food = 1
+            state.dir_food = pose.orientation.yaw
+            state.P_food = 1
+        }
     }
 
     # broadcast P_food, P_home, dirs, current heading
@@ -132,7 +170,7 @@ function step() {
 function C_eval(action) {
     # Sum the collision risk per neighbor to find the C_val of this action
     sum_c = reduce(neighbor_list, function(n, accumulator) {
-        return math.exp(-distance(n, action)/(2*DISTANCE_SENSITIVITY_FACTOR^2)) + accumulator
+        return math.exp(-distance(n, action) / (2*DISTANCE_SENSITIVITY_FACTOR^2)) + accumulator
     })
 }
 
@@ -144,17 +182,53 @@ function argmin(table){
     return arg_compare(table, function(a,b){return a<b})
 }
 
+# Using Argos and Buzz’s “language” is like being tasked with building Buckingham Palace out of soggy crumpets
+#    - no arrays, no lists, and about as functional as a chocolate teapot, leaving you desperate for a proper cuppa just to soothe the soul-crushing despair [/s]
+
 function arg_compare(table, comparator) {
     # Find the action with the maximum value
-    max_key = table[0]
-    max_value = table[max_key]
+    first = 1
     foreach(table, function(key, value) {
+        if (first) {
+            max_key = key
+            max_value = value
+            first = 0
+        }
         if (comparator(table[key], max_value)) {
             max_value = table[key]
-            max_key = action
+            max_key = key
         }
     })
     return max_key
+}
+
+function close_to_wall() {
+# driving code from prior homework
+    # Transform the proximity readings into vectors
+    proximity_vec2 = map(proximity,
+    function(index,reading) {
+        return math.vec2.newp(reading.value, reading.angle)	
+    })
+
+    # Sum the vectors to find the obstacles to avoid
+    accumulator = reduce(proximity_vec2,
+    function(index,value,acc) {
+        return math.vec2.add(value, acc)
+    },
+    math.vec2.new(0.0, 0.0))
+
+    # Divide by the number of proximity readings
+    accumulator = math.vec2.scale(accumulator, 1.0 / size(proximity))
+    length = math.vec2.length(accumulator)
+    angle = math.vec2.angle(accumulator)
+
+    # If the angle of the accumulator is within a certain threshold and its length
+    # is beyond another, we need to avoid  the obstacles.
+    # Otherwise, it's safe to go straight.
+    if((math.abs(angle) < ANGLE_THRESHOLD) and (length > LENGTH_THRESHOLD)) {
+        return 1
+    }
+    return 0
 }
 
 function distance(neighbor, action) {
