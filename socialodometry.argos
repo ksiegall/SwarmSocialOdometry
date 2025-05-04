@@ -104,15 +104,17 @@
       - robots: parameter 'N_u' in the slides
       - msg_size: max size of a message in bytes
   -->
-      
-  <!-- <loop_functions library="build/libcbaa"
-                  label="cbaa"
+
+  <loop_functions library="build/libcbaa"
+                  label="socialodometry"
                   outfile="data.dat"
                   tasks="3"
                   robots="40"
-                  msg_size="300">
+                  msg_size="300"
+                  nest_one_pos="(5.0,5.0)"
+                  food_one_pos="(-5.0,-5.0)">
 
-  </loop_functions>   -->
+  </loop_functions>  
 
 
   <!-- *********************** -->
@@ -149,9 +151,9 @@
       <body position="-12.5,0,0" orientation="0,0,0" />
     </box>
 
-    <!-- <floor id="floor"
+    <floor id="floor"
     source="loop_functions"
-    pixels_per_meter="50" /> -->
+    pixels_per_meter="50" />
 
     <!--
         You can distribute entities randomly. Here, we distribute
@@ -162,7 +164,7 @@
         from a gaussian distribution, whose mean is zero degrees and
         standard deviation is 360 degrees.
     -->
-    <distribute>
+    <!-- <distribute>
       <position method="uniform" min="-12,-12,0" max="12,12,0" />
       <orientation method="gaussian" mean="0,0,0" std_dev="360,0,0" />
       <entity quantity="40" max_trials="100">
@@ -170,7 +172,7 @@
           <controller config="bfc" />
         </foot-bot>
       </entity>
-    </distribute>
+    </distribute> -->
 
     <!--
         We distribute 5 boxes uniformly in position and rotation around Z.

@@ -36,4 +36,4 @@ target_link_libraries(cbaa
   argos3plugin_simulator_buzz)
 
 # Compile Buzz files
-buzz_make(cbaa.bzz)
+buzz_make(socialodometry.bzz)

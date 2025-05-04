@@ -6,7 +6,7 @@ NEST = {.x = -5, .y = -5}
 FOOD = {.x = 5, .y = 5}
 
 
-NEST_FOOD_POSITION_TOLERANCE = 0.3
+NEST_FOOD_POSITION_TOLERANCE = 2
 SIGNAL_DECAY_RATE = 0.2
 # First pair is weights when navigating to food
 # Second pair is weights when navigating to home
@@ -60,8 +60,7 @@ function init() {
 ### TODO:
 # - compile and make loop function visualize the food/nest pair positions
 # - Once food/nest is found, save current heading
-
-
+ 
 # Executed once every time step
 function step() {
 

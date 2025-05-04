@@ -61,7 +61,7 @@ public:
    virtual void BuzzBytecodeUpdated();
 
    /* Returns task information */
-   std::vector<STask> GetTasks() const;
+   // std::vector<STask> GetTasks() const;
 
 private:
 
@@ -71,7 +71,7 @@ private:
 private:
 
    /** Task data */
-   std::vector<STask> m_vecTasks;
+   // std::vector<STask> m_vecTasks;
    std::vector<STask> nest_pair_one;
    std::vector<STask> nest_pair_two;
 
