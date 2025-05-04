@@ -40,7 +40,7 @@
           subsequent <arena> section to say which robots use which
           controller
     -->
-    <buzz_controller_footbot id="bfc">
+    <buzz_controller_footbot id="fbc">
       <!--
           The <actuators> section contains a list of the actuators used by
           this controller.
@@ -108,11 +108,14 @@
   <loop_functions library="build/libcbaa"
                   label="socialodometry"
                   outfile="data.dat"
-                  tasks="3"
-                  robots="40"
+                  tasks="1"
+                  robots="80"
+                  commsRange="5.0"
                   msg_size="300"
-                  nest_one_pos="(5.0,5.0)"
-                  food_one_pos="(-5.0,-5.0)">
+                  nest_one_pos_x="3.0"
+                  nest_one_pos_y="3.0"
+                  food_one_pos_x="-8.0"
+                  food_one_pos_y="-8.0">
 
   </loop_functions>  
 
@@ -249,7 +252,7 @@
     <qt-opengl>
       <camera>
         <placements>
-          <placement index="0" position="0,0,10" look_at="0, 0, 0" up="1, 0, 0" lens_focal_length="10" />
+          <placement index="0" position="0,0,10" look_at="0,0,0" up="0,1,0" lens_focal_length="10" />
         </placements>
       </camera>
       <user_functions label="buzz_qt" />

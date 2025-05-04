@@ -50,9 +50,9 @@
 //    return yij;
 // }
 
-// /**
-//  * Functor to get data from the robots
-//  */
+/**
+ * Functor to get data from the robots
+ */
 // struct GetRobotData : public CBuzzLoopFunctions::COperation {
 
 //    /** Constructor */
@@ -87,7 +87,7 @@
 //    std::map<std::string, SAssignment> m_mapAssignments;
 // };
 
-/****************************************/
+// /****************************************/
 /****************************************/
 
 // /**
@@ -138,10 +138,21 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
    GetNodeAttribute(t_tree, "tasks", nTasks);
    int nMsgSize;
    GetNodeAttribute(t_tree, "msg_size", nMsgSize);
+   Real commsRange;
+   GetNodeAttribute(t_tree, "commsRange", commsRange);
+
+   Real nest_one_pos_x, nest_one_pos_y;
+   Real food_one_pos_x, food_one_pos_y;
+   GetNodeAttribute(t_tree, "nest_one_pos_x", nest_one_pos_x);
+   GetNodeAttribute(t_tree, "nest_one_pos_y", nest_one_pos_y);
+   GetNodeAttribute(t_tree, "food_one_pos_x", food_one_pos_x);
+   GetNodeAttribute(t_tree, "food_one_pos_y", food_one_pos_y);
+
+
    CVector2 nest_one_pos;
-   GetNodeAttribute(t_tree, "nest_one_pos", nest_one_pos);
+   nest_one_pos.Set(nest_one_pos_x, nest_one_pos_y);
    CVector2 food_one_pos;
-   GetNodeAttribute(t_tree, "food_one_pos", food_one_pos);
+   food_one_pos.Set(food_one_pos_x, food_one_pos_y);
 
 
    /* Create a new RNG */
@@ -176,7 +187,7 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
             "fbc",       // controller id as defined in .argos file
             cPos,        // position
             cOrient,     // orientation
-            10.0,        // communication range in meters
+            commsRange,        // communication range in meters
             nMsgSize);   // max message size in bytes
 
          /* Add the foot-bot to the simulation */
@@ -196,21 +207,23 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
    /* Make the nests and food */
    // manually define the task nests position and food position vectors
    nest_pair_one.resize(2);
-   nest_pair_two.resize(2);
+   // nest_pair_two.resize(2);
 
    CVector2 cPos;
    // nest one
-   cPos.Set(-5.0, -5.0);
    nest_pair_one[0].Position = nest_one_pos;
    // food one
-   cPos.Set(5.0, 5.0);
    nest_pair_one[1].Position = food_one_pos;
 
+   // create a table that holds the nest and food positions
+   
+
+
    // nest two
-   cPos.Set(0.0, -5.0);
-   nest_pair_two[0].Position = cPos;
-   cPos.Set(0.0, 5.0);
-   nest_pair_two[1].Position = cPos;
+   // cPos.Set(0.0, -5.0);
+   // nest_pair_two[0].Position = food_two_pos;
+   // cPos.Set(0.0, 5.0);
+   // nest_pair_two[1].Position = cPos;
 
 
    // /* Generate the tasks */
@@ -263,7 +276,7 @@ void CCBAA::Destroy() {
 /****************************************/
 /****************************************/
 
-static Real TASK_RADIUS = 0.5;
+static Real TASK_RADIUS = 1;
 static Real TASK_RADIUS_2 = TASK_RADIUS * TASK_RADIUS;
 
 
