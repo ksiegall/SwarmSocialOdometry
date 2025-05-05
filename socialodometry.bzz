@@ -11,16 +11,18 @@ FOOD = {.x = -8.0, .y = -8.0}   # red
 NEST_FOOD_POSITION_RADIUS = 1.
 SIGNAL_DECAY_RATE = 0.02
 CONFIDENCE_THRESHOLD = 0.1 # if below this, ignore the signals
+BETA = 0.001 # used to merge confidence values
+
 # First pair is weights when navigating to food
 # Second pair is weights when navigating to home
 # priorities are: food, home, exploration
 priorities = { .0 = {.0 = 0.7, .1 = 0.1, .2=0.2}, .1 = {.0=0.1, .1=0.7, .2=0.2} }
-COLLISION_AVOIDANCE_COEFF = 0
+COLLISION_AVOIDANCE_COEFF = 0.0
 DISTANCE_SENSITIVITY_FACTOR = 2.5
 
 # collision avoidance parameters
 ANGLE_THRESHOLD = math.pi / 2
-LENGTH_THRESHOLD = 0
+LENGTH_THRESHOLD = 0.0
 
 # tracking the performance of the robot
 food_recovered = 0
@@ -118,27 +120,33 @@ function step() {
                 # 2*0.6 + -1*0.6 = 0.6
                 # 2*0.6 + -3*0.6 = -0.6
                 # (0.6,-0.6) / p_t = (0.5,-0.5) 
-                consensus_approx_home_x = consensus_approx_home_x + x_home*neighbor_list[rid].conf_home
-                consensus_approx_home_y = consensus_approx_home_y + y_home*neighbor_list[rid].conf_home
-                consensus_conf_home = consensus_conf_home + neighbor_list[rid].conf_home
+                # consensus_approx_home_x = consensus_approx_home_x + x_home*neighbor_list[rid].conf_home
+                # consensus_approx_home_y = consensus_approx_home_y + y_home*neighbor_list[rid].conf_home
+                # consensus_conf_home = consensus_conf_home + neighbor_list[rid].conf_home
+
+                # swap to Fermi function and beta confidence merging
+                var c = 1.0 / (1.0 + math.exp(-BETA * (neighbor_list[rid].conf_home - state.conf_home)))
+                consensus_approx_home_x = c * consensus_approx_home_x + (1.0 - c) * x_home
+                consensus_approx_home_y = c * consensus_approx_home_y + (1.0 - c) * y_home
+                state.conf_home = c * consensus_conf_home + (1.0 - c) * neighbor_list[rid].conf_home
             }
 
-            if(neighbor_list[rid].conf_food > CONFIDENCE_THRESHOLD) {
-                valid_neighbors_food = valid_neighbors_food + 1.0
-                # implemented 4.2 equation from paper  https://link.springer.com/chapter/10.1007/978-3-540-87527-7_39
-                # robot i is transmitting, robot j is receiving
-                var theta_j_food = neighbor_list[rid].heading_food
-                var azim_global = data.azimuth + pose.orientation.yaw 
-                # CURRENT ISSUE: This math may be incorrect? double check it by hand
-                # shortcut a bit, rotation angle from receiving robot j heading to food heading
-                var x_food = data.distance/100.0 * math.cos(azim_global) + neighbor_list[rid].dist_food * math.cos(theta_j_food) + pose.position.x
-                var y_food = data.distance/100.0 * math.sin(azim_global) + neighbor_list[rid].dist_food * math.sin(theta_j_food) + pose.position.y
+            # if(neighbor_list[rid].conf_food > CONFIDENCE_THRESHOLD) {
+            #     valid_neighbors_food = valid_neighbors_food + 1.0
+            #     # implemented 4.2 equation from paper  https://link.springer.com/chapter/10.1007/978-3-540-87527-7_39
+            #     # robot i is transmitting, robot j is receiving
+            #     var theta_j_food = neighbor_list[rid].heading_food
+            #     var azim_global = data.azimuth + pose.orientation.yaw 
+            #     # CURRENT ISSUE: This math may be incorrect? double check it by hand
+            #     # shortcut a bit, rotation angle from receiving robot j heading to food heading
+            #     var x_food = data.distance/100.0 * math.cos(azim_global) + neighbor_list[rid].dist_food * math.cos(theta_j_food) + pose.position.x
+            #     var y_food = data.distance/100.0 * math.sin(azim_global) + neighbor_list[rid].dist_food * math.sin(theta_j_food) + pose.position.y
                 
-                consensus_approx_food_x = consensus_approx_food_x + x_nest*neighbor_list[rid].conf_food
-                consensus_approx_food_y = consensus_approx_food_y + y_nest*neighbor_list[rid].conf_food
-                consensus_conf_food = consensus_conf_food + neighbor_list[rid].conf_food
+            #     consensus_approx_food_x = consensus_approx_food_x + x_food*neighbor_list[rid].conf_food
+            #     consensus_approx_food_y = consensus_approx_food_y + y_food*neighbor_list[rid].conf_food
+            #     consensus_conf_food = consensus_conf_food + neighbor_list[rid].conf_food
 
-            }
+            # }
 
         })
         
@@ -150,22 +158,29 @@ function step() {
         if(valid_neighbors_home > 0) {
             # log("Robot ", id, ": ", "valid_neighbors_home: ", valid_neighbors_home, ", consensus_conf_home: ", consensus_conf_home)
             # normalizing the approximations
-            approx_home_pos.x = (consensus_approx_home_x / (consensus_conf_home+0.00001)) 
-            approx_home_pos.y = (consensus_approx_home_y / (consensus_conf_home+0.00001))
-            # avg confidence
-            state.conf_home = consensus_conf_home / (1.0 + valid_neighbors_home+0.00001)
+            # approx_home_pos.x = (consensus_approx_home_x / (consensus_conf_home+0.00001)) 
+            # approx_home_pos.y = (consensus_approx_home_y / (consensus_conf_home+0.00001))
+            # # avg confidence
+            # state.conf_home = consensus_conf_home / (1.0 + valid_neighbors_home+0.00001)
+
+            # consensus fermi
+            log("Robot ", id, ": ", "concensus_approx_home_x: ", consensus_approx_home_x, 
+                ", concensus_approx_home_y: ", consensus_approx_home_y, 
+                ", consensus_conf_home: ", consensus_conf_home)
+            approx_home_pos.x = concensus_approx_home_x
+            approx_home_pos.y = consensus_approx_home_y
         }
 
-        if(valid_neighbors_food > 0) {
-            # normalizing the approximations
-            approx_food_pos.x = (consensus_approx_food_x / (consensus_conf_food+0.00001)) 
-            approx_food_pos.y = (consensus_approx_food_y / (consensus_conf_food+0.00001)) 
+        # if(valid_neighbors_food > 0) {
+        #     # normalizing the approximations
+        #     approx_food_pos.x = (consensus_approx_food_x / (consensus_conf_food+0.00001)) 
+        #     approx_food_pos.y = (consensus_approx_food_y / (consensus_conf_food+0.00001)) 
     
-            # CURRENT ISSUE: How to scale the confidence back down if not avg
-            #               rn it drops way too quickly (<1 iteration)
-            # avg confidence
-            state.conf_food = consensus_conf_food / (1.0 + valid_neighbors_food+0.00001)
-        }
+        #     # CURRENT ISSUE: How to scale the confidence back down if not avg
+        #     #               rn it drops way too quickly (<1 iteration)
+        #     # avg confidence
+        #     state.conf_food = consensus_conf_food / (1.0 + valid_neighbors_food+0.00001)
+        # }
     }
     
     # If home or food found (and that was what we were looking for)

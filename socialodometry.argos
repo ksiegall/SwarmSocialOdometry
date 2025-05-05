@@ -109,13 +109,13 @@
                   label="socialodometry"
                   outfile="data.dat"
                   tasks="1"
-                  robots="15"
-                  commsRange="5.0"
+                  robots="60"
+                  commsRange="4.0"
                   msg_size="300"
-                  nest_one_pos_x="-8.0"
-                  nest_one_pos_y="-8.0"
-                  food_one_pos_x="3.0"
-                  food_one_pos_y="3.0">
+                  nest_one_pos_x="3.0"
+                  nest_one_pos_y="3.0"
+                  food_one_pos_x="-8.0"
+                  food_one_pos_y="-8.0">
 
   </loop_functions>  
 
