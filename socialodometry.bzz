@@ -72,31 +72,31 @@ function init() {
 
 # Executed once every time step
 function step() {
-    
     if(size(neighbor_list) > 0){
+        # num_neighbors = size(neighbor_list)
         valid_neighbors_food = 0.0
         valid_neighbors_home = 0.0
-        # num_neighbors = size(neighbor_list)
+
         # if we start it with our values, they will propagate with confidence to reach a "global consensus" on where the food and nest are
         consensus_approx_food_x = approx_food_pos.x * state.conf_food
         consensus_approx_food_y = approx_food_pos.y * state.conf_food
         # Decay our confidence a little before averaging everything together
         state.conf_food = (1.0 - SIGNAL_DECAY_RATE) * state.conf_food
-        # state.conf_food = state.conf_food
         consensus_conf_food = state.conf_food
     
         consensus_approx_home_x = approx_home_pos.x * state.conf_home
         consensus_approx_home_y = approx_home_pos.y * state.conf_home
-        # state.conf_home = state.conf_home
         state.conf_home = (1.0 - SIGNAL_DECAY_RATE) * state.conf_home
         consensus_conf_home = state.conf_home
+        # state.conf_home = state.conf_home
 
-        # Update conf_food and conf_home based on neighbors
+        # Update conf_food and conf_home based on neighbors values
         neighbors.foreach(function(rid, data) {
             # log("robot ", rid, ": ",
             #     "distance  = ", data.distance, ", ",
             #     "azimuth   = ", data.azimuth, ", ",
             #     )
+
             if(neighbor_list[rid].conf_home > CONFIDENCE_THRESHOLD) {
                 valid_neighbors_home = valid_neighbors_home + 1.0
                 var theta_j_home = neighbor_list[rid].heading_home   
@@ -174,7 +174,8 @@ function step() {
         }
         approx_home_pos = {.x = pose.position.x, .y = pose.position.y }
         state.conf_home = 1
-    } else if(calc_dist(pose.position, FOOD) < NEST_FOOD_POSITION_RADIUS) {
+    } 
+    else if(calc_dist(pose.position, FOOD) < NEST_FOOD_POSITION_RADIUS) {
         # Food found
         if(not has_food) {
             has_food = 1
@@ -205,22 +206,24 @@ function step() {
     var explore_priority = priorities[has_food][2]
 
     foreach(actions_angle, function(key, action){
-        #   Evaluate priorities
+        # Evaluate priorities
         action_val = food_priority*math.cos(action - state.heading_food) + home_priority*math.cos(action - state.heading_home)
+
         # Each robot has its preferred exploration direction (based on its id)
         action_val = action_val - explore_priority * math.abs(key - VALUE_OF_EXPLORATION) / NUM_ANGLE_DIVISIONS
+
         #   Start without collision avoidance
         # action_val = action_val - COLLISION_AVOIDANCE_COEFF*C_eval(action) 
         #   Save resulting weight
         
-        # log("Action: ", action, " Value: ", action_val)
+
         # action = heading
         # action_val = score per heading
         action_values[action] = action_val
     })
 
+    # Change the exploration value to prefer a different direction, slowly over time
     if (close_to_wall()) {
-        # just change the exploration value to prefer a different direction slowly
         log("Robot ", id, ": close to wall, exploring")
         VALUE_OF_EXPLORATION = ((VALUE_OF_EXPLORATION + 0.2)) % NUM_ANGLE_DIVISIONS
     }
@@ -228,11 +231,12 @@ function step() {
     # Grab the argmax action, do it
     desired_heading = argmax(action_values)
     
+    # Driving code:
+    #   Slows down based on the curvature of the path
     error = desired_heading - pose.orientation.yaw
-    # log("Error: ", error, " Desired heading: ", desired_heading, " Current heading: ", pose.orientation.yaw)
     var kp = 3
-    # Slows down based on the curvature of the path
     set_wheels(base_speed/(math.abs(error)+1) - kp*error, base_speed/(math.abs(error)+1) + kp*error)
+    # log("Error: ", error, " Desired heading: ", desired_heading, " Current heading: ", pose.orientation.yaw)
     
 
     # broadcast conf_food, conf_home, dirs, current heading
@@ -245,6 +249,7 @@ function step() {
         # looking for home, green LED
        set_leds(30, 255, 30)
     }
+
     neighbor_list = {}
 }
 
