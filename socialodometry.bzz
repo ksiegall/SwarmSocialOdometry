@@ -13,7 +13,8 @@ SIGNAL_DECAY_RATE = 0.02
 CONFIDENCE_THRESHOLD = 0.1 # if below this, ignore the signals
 # First pair is weights when navigating to food
 # Second pair is weights when navigating to home
-priorities = { .0 = {.0 = 0.6, .1 = 0.2, .2=0.2}, .1 = {.0=0.2, .1=0.7, .2=0.2} }
+# priorities are: food, home, exploration
+priorities = { .0 = {.0 = 0.7, .1 = 0.1, .2=0.2}, .1 = {.0=0.1, .1=0.7, .2=0.2} }
 COLLISION_AVOIDANCE_COEFF = 0
 DISTANCE_SENSITIVITY_FACTOR = 2.5
 
@@ -28,7 +29,7 @@ base_speed = 25
 
 # generate possible actions array around the circle
 actions_angle = {}
-NUM_ANGLE_DIVISIONS = 20
+NUM_ANGLE_DIVISIONS = 20.0
 for (i = 0, i < NUM_ANGLE_DIVISIONS, i = i + 1) {
     actions_angle[i] = i * (2*math.pi / NUM_ANGLE_DIVISIONS) - math.pi
 }
@@ -91,7 +92,7 @@ function step() {
         state.conf_home = (1.0 - SIGNAL_DECAY_RATE) * state.conf_home
         # state.conf_home = state.conf_home
 
-        log("Robot ", id, ": ", "consensus_conf_food: ", consensus_conf_food, ", consensus_conf_home: ", consensus_conf_home)
+        # log("Robot ", id, ": ", "consensus_conf_food: ", consensus_conf_food, ", consensus_conf_home: ", consensus_conf_home)
         # Update conf_food and conf_home based on neighbors values
         neighbors.foreach(function(rid, data) {
             # log("robot ", rid, ": ",
@@ -104,12 +105,12 @@ function step() {
                 valid_neighbors_home = valid_neighbors_home + 1.0
                 var theta_j_home = neighbor_list[rid].heading_home
                 var azim_global = data.azimuth + pose.orientation.yaw 
-                log("Has heading home: ", theta_j_home, " with dist: ", neighbor_list[rid].dist_home, " gamma_j ", data.azimuth, " dij ", data.distance/100.0)
+                # log("Has heading home: ", theta_j_home, " with dist: ", neighbor_list[rid].dist_home, " gamma_j ", data.azimuth, " dij ", data.distance/100.0)
                 # shortcut a bit, rotation angle from receiving robot j heading to home heading
                 var x_home = data.distance/100.0 * math.cos(azim_global) + neighbor_list[rid].dist_home * math.cos(theta_j_home) + pose.position.x
                 var y_home = data.distance/100.0 * math.sin(azim_global) + neighbor_list[rid].dist_home * math.sin(theta_j_home) + pose.position.y
 
-                log("I ", rid, " thing home is at: ", x_home, ", ", y_home, " with confidence: ", neighbor_list[rid].conf_home)
+                # log("I ", rid, " thing home is at: ", x_home, ", ", y_home, " with confidence: ", neighbor_list[rid].conf_home)
 
                 # weighted average of the food position
                 # (2,2) p = 0.6, (-1,-3) p = 0.6
@@ -147,7 +148,7 @@ function step() {
         #     consensus_approx_home_y, ", Consensus_sum_conf_home: ", consensus_conf_home)
 
         if(valid_neighbors_home > 0) {
-            log("Robot ", id, ": ", "valid_neighbors_home: ", valid_neighbors_home, ", consensus_conf_home: ", consensus_conf_home)
+            # log("Robot ", id, ": ", "valid_neighbors_home: ", valid_neighbors_home, ", consensus_conf_home: ", consensus_conf_home)
             # normalizing the approximations
             approx_home_pos.x = (consensus_approx_home_x / (consensus_conf_home+0.00001)) 
             approx_home_pos.y = (consensus_approx_home_y / (consensus_conf_home+0.00001))
@@ -213,7 +214,6 @@ function step() {
     foreach(actions_angle, function(key, action){
         # Evaluate priorities
         action_val = food_priority*math.cos(action - state.heading_food) + home_priority*math.cos(action - state.heading_home)
-
         # Each robot has its preferred exploration direction (based on its id)
         action_val = action_val - explore_priority * math.abs(key - VALUE_OF_EXPLORATION) / NUM_ANGLE_DIVISIONS
 
