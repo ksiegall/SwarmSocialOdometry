@@ -81,13 +81,13 @@ function step() {
         consensus_approx_food_x = approx_food_pos.x * state.conf_food
         consensus_approx_food_y = approx_food_pos.y * state.conf_food
         # Decay our confidence a little before averaging everything together
-        state.conf_food = (1.0 - SIGNAL_DECAY_RATE) * state.conf_food
         consensus_conf_food = state.conf_food
+        state.conf_food = (1.0 - SIGNAL_DECAY_RATE) * state.conf_food
     
         consensus_approx_home_x = approx_home_pos.x * state.conf_home
         consensus_approx_home_y = approx_home_pos.y * state.conf_home
-        state.conf_home = (1.0 - SIGNAL_DECAY_RATE) * state.conf_home
         consensus_conf_home = state.conf_home
+        state.conf_home = (1.0 - SIGNAL_DECAY_RATE) * state.conf_home
         # state.conf_home = state.conf_home
 
         # Update conf_food and conf_home based on neighbors values
@@ -104,6 +104,14 @@ function step() {
                 var x_home = data.distance * math.cos(data.azimuth) + neighbor_list[rid].dist_home * math.cos(theta_j_home)
                 var y_home = data.distance * math.sin(data.azimuth) + neighbor_list[rid].dist_home * math.sin(theta_j_home)
 
+                log("I ", rid, " thing home is at: ", x_home, ", ", y_home, " with confidence: ", neighbor_list[rid].conf_home)
+
+                # weighted average of the food position
+                # (2,2) p = 0.6, (-1,-3) p = 0.6
+                # p_t = 1.2
+                # 2*0.6 + -1*0.6 = 0.6
+                # 2*0.6 + -3*0.6 = -0.6
+                # (0.6,-0.6) / p_t = (0.5,-0.5) 
                 consensus_approx_home_x = consensus_approx_home_x + x_home*neighbor_list[rid].conf_home
                 consensus_approx_home_y = consensus_approx_home_y + y_home*neighbor_list[rid].conf_home
                 consensus_conf_home = consensus_conf_home + neighbor_list[rid].conf_home
@@ -119,15 +127,7 @@ function step() {
                 # shortcut a bit, rotation angle from receiving robot j heading to food heading
                 var x_food = data.distance * math.cos(data.azimuth) + neighbor_list[rid].dist_food * math.cos(theta_j_food)
                 var y_food = data.distance * math.sin(data.azimuth) + neighbor_list[rid].dist_food * math.sin(theta_j_food)
-
-                # weighted average of the food position
                 
-                # (2,2) p = 0.6, (-1,-3) p = 0.6
-                # p_t = 1.2
-                # 2*0.6 + -1*0.6 = 0.6
-                # 2*0.6 + -3*0.6 = -0.6
-                # (0.6,-0.6) / p_t = (0.5,-0.5) 
-                log("Robot ",rid,": Food confidence: ",neighbor_list[rid].conf_food,", Nest confidence: ",neighbor_list[rid].conf_home)
                 consensus_approx_food_x = consensus_approx_food_x + x_nest*neighbor_list[rid].conf_food
                 consensus_approx_food_y = consensus_approx_food_y + y_nest*neighbor_list[rid].conf_food
                 consensus_conf_food = consensus_conf_food + neighbor_list[rid].conf_food
@@ -147,7 +147,7 @@ function step() {
             approx_home_pos.x = (consensus_approx_home_x / (consensus_conf_home+0.0001)) 
             approx_home_pos.y = (consensus_approx_home_y / (consensus_conf_home+0.0001)) 
             # avg confidence
-            state.conf_home = consensus_conf_home / (valid_neighbors_home+0.0001)
+            # state.conf_home = consensus_conf_home / (valid_neighbors_home+0.0001)
         }
 
         if(valid_neighbors_food > 0) {
@@ -158,7 +158,7 @@ function step() {
             # CURRENT ISSUE: How to scale the confidence back down if not avg
             #               rn it drops way too quickly (<1 iteration)
             # avg confidence
-            state.conf_food = consensus_conf_food / (valid_neighbors_food+0.0001)
+            # state.conf_food = consensus_conf_food / (valid_neighbors_food+0.0001)
         }
     }
     
@@ -184,8 +184,8 @@ function step() {
         state.conf_food = 1
     }
 
-    log("Robot ", id, ": ", "conf_food = ", state.conf_food, ", x_food = ", approx_food_pos.x, ", y_food = ", approx_food_pos.y, 
-    ", conf_nest = ", state.conf_home, ", x_nest = ", approx_home_pos.x, ", y_nest = ", approx_home_pos.y)
+    # log("Robot ", id, ": ", "conf_food = ", state.conf_food, ", x_food = ", approx_food_pos.x, ", y_food = ", approx_food_pos.y, 
+    # ", conf_nest = ", state.conf_home, ", x_nest = ", approx_home_pos.x, ", y_nest = ", approx_home_pos.y)
     
     # approx_food_pos
     diff_y_food = approx_food_pos.y - pose.position.y
@@ -224,7 +224,6 @@ function step() {
 
     # Change the exploration value to prefer a different direction, slowly over time
     if (close_to_wall()) {
-        log("Robot ", id, ": close to wall, exploring")
         VALUE_OF_EXPLORATION = ((VALUE_OF_EXPLORATION + 0.2)) % NUM_ANGLE_DIVISIONS
     }
 
