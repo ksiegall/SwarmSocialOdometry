@@ -220,9 +220,9 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
 
 
    // nest two
-   // cPos.Set(0.0, -5.0);
+   // cPos.Set(0.0, -8.0);
    // nest_pair_two[0].Position = food_two_pos;
-   // cPos.Set(0.0, 5.0);
+   // cPos.Set(0.0, 8.0);
    // nest_pair_two[1].Position = cPos;
 
 
@@ -301,7 +301,7 @@ CColor CCBAA::GetFloorColor(const CVector2& c_position_on_plane) {
    // }
 
    // if((c_position_on_plane - nest_pair_two[1].Position).SquareLength() < TASK_RADIUS_2) {
-   //    return CColor::AQUA;
+   //    return CColor::BLUE;
    // }
 
    return CColor::WHITE;
