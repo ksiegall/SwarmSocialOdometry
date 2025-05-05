@@ -2,14 +2,15 @@ include "vec2.bzz"
 
 # THESE TWO SHOULD REALLY BE RANDOMLY PLACED FROM THE C LOOP FUNCTIONS
 # also manually change it in the socialodometry.argos file, as it is hardcoded
+# everything is in SI units, and meters [but buzz internally is in cm, for some reason]
 NEST = {.x = 3.0, .y = 3.0}     # purple
 FOOD = {.x = -8.0, .y = -8.0}   # red
 
 # --------------- Parameters ---------------
 
 NEST_FOOD_POSITION_RADIUS = 1.
-SIGNAL_DECAY_RATE = 0.01
-CONFIDENCE_THRESHOLD = 0.01 # if below this, ignore the signals
+SIGNAL_DECAY_RATE = 0.02
+CONFIDENCE_THRESHOLD = 0.1 # if below this, ignore the signals
 # First pair is weights when navigating to food
 # Second pair is weights when navigating to home
 priorities = { .0 = {.0 = 0.6, .1 = 0.2, .2=0.2}, .1 = {.0=0.2, .1=0.7, .2=0.2} }
@@ -90,6 +91,7 @@ function step() {
         state.conf_home = (1.0 - SIGNAL_DECAY_RATE) * state.conf_home
         # state.conf_home = state.conf_home
 
+        log("Robot ", id, ": ", "consensus_conf_food: ", consensus_conf_food, ", consensus_conf_home: ", consensus_conf_home)
         # Update conf_food and conf_home based on neighbors values
         neighbors.foreach(function(rid, data) {
             # log("robot ", rid, ": ",
@@ -97,12 +99,15 @@ function step() {
             #     "azimuth   = ", data.azimuth, ", ",
             #     )
 
+            # everything be in meters; robot positions are in global frame, so math.cos(azimuth_rab + robot.yaw)
             if(neighbor_list[rid].conf_home > CONFIDENCE_THRESHOLD) {
                 valid_neighbors_home = valid_neighbors_home + 1.0
-                var theta_j_home = neighbor_list[rid].heading_home   
+                var theta_j_home = neighbor_list[rid].heading_home
+                var azim_global = data.azimuth + pose.orientation.yaw 
+                log("Has heading home: ", theta_j_home, " with dist: ", neighbor_list[rid].dist_home, " gamma_j ", data.azimuth, " dij ", data.distance/100.0)
                 # shortcut a bit, rotation angle from receiving robot j heading to home heading
-                var x_home = data.distance * math.cos(data.azimuth) + neighbor_list[rid].dist_home * math.cos(theta_j_home)
-                var y_home = data.distance * math.sin(data.azimuth) + neighbor_list[rid].dist_home * math.sin(theta_j_home)
+                var x_home = data.distance/100.0 * math.cos(azim_global) + neighbor_list[rid].dist_home * math.cos(theta_j_home) + pose.position.x
+                var y_home = data.distance/100.0 * math.sin(azim_global) + neighbor_list[rid].dist_home * math.sin(theta_j_home) + pose.position.y
 
                 log("I ", rid, " thing home is at: ", x_home, ", ", y_home, " with confidence: ", neighbor_list[rid].conf_home)
 
@@ -121,12 +126,12 @@ function step() {
                 valid_neighbors_food = valid_neighbors_food + 1.0
                 # implemented 4.2 equation from paper  https://link.springer.com/chapter/10.1007/978-3-540-87527-7_39
                 # robot i is transmitting, robot j is receiving
-                var theta_j_food = neighbor_list[rid].heading_food   
-
+                var theta_j_food = neighbor_list[rid].heading_food
+                var azim_global = data.azimuth + pose.orientation.yaw 
                 # CURRENT ISSUE: This math may be incorrect? double check it by hand
                 # shortcut a bit, rotation angle from receiving robot j heading to food heading
-                var x_food = data.distance * math.cos(data.azimuth) + neighbor_list[rid].dist_food * math.cos(theta_j_food)
-                var y_food = data.distance * math.sin(data.azimuth) + neighbor_list[rid].dist_food * math.sin(theta_j_food)
+                var x_food = data.distance/100.0 * math.cos(azim_global) + neighbor_list[rid].dist_food * math.cos(theta_j_food) + pose.position.x
+                var y_food = data.distance/100.0 * math.sin(azim_global) + neighbor_list[rid].dist_food * math.sin(theta_j_food) + pose.position.y
                 
                 consensus_approx_food_x = consensus_approx_food_x + x_nest*neighbor_list[rid].conf_food
                 consensus_approx_food_y = consensus_approx_food_y + y_nest*neighbor_list[rid].conf_food
@@ -144,21 +149,21 @@ function step() {
         if(valid_neighbors_home > 0) {
             log("Robot ", id, ": ", "valid_neighbors_home: ", valid_neighbors_home, ", consensus_conf_home: ", consensus_conf_home)
             # normalizing the approximations
-            approx_home_pos.x = (consensus_approx_home_x / (consensus_conf_home+0.0001)) 
-            approx_home_pos.y = (consensus_approx_home_y / (consensus_conf_home+0.0001)) 
+            approx_home_pos.x = (consensus_approx_home_x / (consensus_conf_home+0.00001)) 
+            approx_home_pos.y = (consensus_approx_home_y / (consensus_conf_home+0.00001))
             # avg confidence
-            # state.conf_home = consensus_conf_home / (valid_neighbors_home+0.0001)
+            state.conf_home = consensus_conf_home / (1.0 + valid_neighbors_home+0.00001)
         }
 
         if(valid_neighbors_food > 0) {
             # normalizing the approximations
-            approx_food_pos.x = (consensus_approx_food_x / (consensus_conf_food+0.0001)) 
-            approx_food_pos.y = (consensus_approx_food_y / (consensus_conf_food+0.0001)) 
+            approx_food_pos.x = (consensus_approx_food_x / (consensus_conf_food+0.00001)) 
+            approx_food_pos.y = (consensus_approx_food_y / (consensus_conf_food+0.00001)) 
     
             # CURRENT ISSUE: How to scale the confidence back down if not avg
             #               rn it drops way too quickly (<1 iteration)
             # avg confidence
-            # state.conf_food = consensus_conf_food / (valid_neighbors_food+0.0001)
+            state.conf_food = consensus_conf_food / (1.0 + valid_neighbors_food+0.00001)
         }
     }
     
