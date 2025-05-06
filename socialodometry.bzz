@@ -10,8 +10,9 @@ BETA = 1.0 # used to merge confidence values
 # Second pair is weights when navigating to home
 # priorities are: food, home, exploration
 priorities = { .0 = {.0 = 0.7, .1 = 0.1, .2=0.2}, .1 = {.0=0.1, .1=0.7, .2=0.2} }
-COLLISION_AVOIDANCE_COEFF = 0.0
-DISTANCE_SENSITIVITY_FACTOR = 2.5
+COLLISION_AVOIDANCE_COEFF = 0.1
+DISTANCE_SENSITIVITY_FACTOR = 10
+FOOTBOT_SIZE = 0.17 # Minimum distance between robots
 
 # collision avoidance parameters
 ANGLE_THRESHOLD = math.pi / 2
@@ -145,56 +146,18 @@ function step() {
 
             }
         })
-        
-        # Log intermediate consensus values
-        # log("Robot ", id, ": ", "Consensus_sum_food_x: ", consensus_approx_food_x, ", Consensus_sum_food_y: ", 
-        #     consensus_approx_food_y, ", Consensus_sum_conf_food: ", consensus_conf_food,
-        #     ", Consensus_sum_home_x: ", consensus_approx_home_x, ", Consensus_sum_home_y: ", 
-        #     consensus_approx_home_y, ", Consensus_sum_conf_home: ", consensus_conf_home)
 
         if(valid_neighbors_home > 0) {
 
             # consensus fermi
-            # log("Robot ", id, ": ", "concensus_approx_home_x: ", consensus_approx_home_x, 
-            #     ", concensus_approx_home_y: ", consensus_approx_home_y, 
-            #     ", consensus_conf_home: ", consensus_conf_home)
             approx_home_pos.x = consensus_approx_home_x
             approx_home_pos.y = consensus_approx_home_y
-
-            # var raw_hconf = consensus_conf_home / valid_neighbors_home
-            # raw_hconf = math.min(1.0, math.max(0.0, raw_hconf))
-            # # delta between new and old pooled
-            # var delta_h = raw_hconf - state.conf_home
-            # # avoid exp() overflow
-            # delta_h = math.min(50.0, math.max(-50.0, delta_h))
-            # var c_h = 1.0 / (1.0 + math.exp(-BETA * delta_h))
-
-            # var pooled_hx = consensus_approx_home_x / consensus_conf_home
-            # var pooled_hy = consensus_approx_home_y / consensus_conf_home 
-            # var c = 1.0 / (1.0 + math.exp(-BETA * (consensus_conf_home - state.conf_home)))
-            # approx_home_pos.x = c_h * approx_home_pos.x + (1.0 - c_h) * pooled_hx
-            # approx_home_pos.y = c_h * approx_home_pos.y + (1.0 - c_h) * pooled_hy
-            # state.conf_home = c_h * state.conf_home + (1.0 - c_h) * raw_hconf
         }
 
         if(valid_neighbors_food > 0) {
-
             # consensus fermi
             approx_food_pos.x = consensus_approx_food_x
             approx_food_pos.y = consensus_approx_food_y
-
-            # var raw_fconf = consensus_conf_food / valid_neighbors_food
-            # raw_fconf = math.min(1.0, math.max(0.0, raw_fconf))
-            # var delta_f = raw_fconf - state.conf_food
-            # delta_f = math.min(50.0, math.max(-50.0, delta_f))
-            # var c_f = 1.0 / (1.0 + math.exp(-BETA * delta_f))
-
-            # var pooled_fx = consensus_approx_food_x / consensus_conf_food
-            # var pooled_fy = consensus_approx_food_y / consensus_conf_food
-
-            # approx_food_pos.x = c_f * approx_food_pos.x + (1.0 - c_f) * pooled_fx
-            # approx_food_pos.y = c_f * approx_food_pos.y + (1.0 - c_f) * pooled_fy
-            # state.conf_food   = c_f * state.conf_food   + (1.0 - c_f) * raw_fconf
         }
     }
     
@@ -207,6 +170,7 @@ function step() {
         if(has_food) {
             has_food = 0
             food_recovered = food_recovered + 1
+            log("More food delivered to the nest by robot ", id, "! Total: ", food_recovered)
         }
         approx_home_pos = {.x = nest_pair_one.nest.x, .y = nest_pair_one.nest.y }
         state.conf_home = 1
@@ -220,9 +184,6 @@ function step() {
         state.conf_food = 1
     }
 
-    # log("Robot ", id, ": ", "conf_food = ", state.conf_food, ", x_food = ", approx_food_pos.x, ", y_food = ", approx_food_pos.y, 
-    # ", conf_nest = ", state.conf_home, ", x_nest = ", approx_home_pos.x, ", y_nest = ", approx_home_pos.y)
-    
     # approx_food_pos
     diff_y_food = approx_food_pos.y - pose.position.y
     diff_x_food = approx_food_pos.x - pose.position.x
@@ -242,23 +203,16 @@ function step() {
     var explore_priority = priorities[has_food][2]
 
     foreach(actions_angle, function(key, action){
-
-        # TBH I do not trust this part of the code
-        # If the reason our shit doesn't work is us and not the paper
-        # then its almost certainly coming from here
-
         # Evaluate priorities
-        action_val = food_priority*math.cos(action - state.heading_food) + home_priority*math.cos(action - state.heading_home)
+        action_val = food_priority*math.cos(action - state.heading_food)
+        action_val = action_val + home_priority*math.cos(action - state.heading_home)
         # Each robot has its preferred exploration direction (based on its id)
-        action_val = action_val - explore_priority * math.abs(key - VALUE_OF_EXPLORATION) / NUM_ANGLE_DIVISIONS
+        action_val = action_val + explore_priority * (1 - math.abs(key - VALUE_OF_EXPLORATION) / NUM_ANGLE_DIVISIONS)
 
         #   Start without collision avoidance
-        # action_val = action_val - COLLISION_AVOIDANCE_COEFF*C_eval(action) 
+        action_val = action_val + COLLISION_AVOIDANCE_COEFF*(1 - C_eval(action)) 
         #   Save resulting weight
         
-
-        # action = heading
-        # action_val = score per heading
         action_values[action] = action_val
     })
 
@@ -296,12 +250,6 @@ function step() {
 
 # --------------- Helper functions ---------------
 
-function C_eval(action) {
-    # Sum the collision risk per neighbor to find the C_val of this action
-    sum_c = reduce(neighbor_list, function(n, accumulator) {
-        return math.exp(-distance(n, action) / (2*DISTANCE_SENSITIVITY_FACTOR^2)) + accumulator
-    })
-}
 
 function argmax(table){
     return arg_compare(table, function(a,b){return a>b})
@@ -316,13 +264,13 @@ function argmin(table){
 
 # Typo or something, doesn't work
 # function arg_compare(t, cmp) {
-#     var am = reduce(t, function(k,v,m){
-#       if((not m) or cmp(m.max,v)) return { .argmax=k, .max=v }
-#       return m
-#     }, nil)
-#     return am.argmax
-#   }
-
+    #     var am = reduce(t, function(k,v,m){
+        #       if((not m) or cmp(m.max,v)) return { .argmax=k, .max=v }
+        #       return m
+        #     }, nil)
+        #     return am.argmax
+        #   }
+        
 function arg_compare(table, comparator) {
     # Find the action with the maximum value
     first = 1
@@ -339,32 +287,32 @@ function arg_compare(table, comparator) {
     })
     return max_key
 }
-
+        
 function calc_dist(pos1, pos2) {
-    # Calculate the distance between two positions
+            # Calculate the distance between two positions
     return math.sqrt((pos1.x - pos2.x)^2 + (pos1.y - pos2.y)^2)
 }
 
 function close_to_wall() {
-# driving code from prior homework
+    # driving code from prior homework
     # Transform the proximity readings into vectors
     proximity_vec2 = map(proximity,
     function(index,reading) {
         return math.vec2.newp(reading.value, reading.angle)	
     })
-
+    
     # Sum the vectors to find the obstacles to avoid
     accumulator = reduce(proximity_vec2,
     function(index,value,acc) {
         return math.vec2.add(value, acc)
     },
     math.vec2.new(0.0, 0.0))
-
+    
     # Divide by the number of proximity readings
     accumulator = math.vec2.scale(accumulator, 1.0 / size(proximity))
     length = math.vec2.length(accumulator)
     angle = math.vec2.angle(accumulator)
-
+    
     # If the angle of the accumulator is within a certain threshold and its length
     # is beyond another, we need to avoid  the obstacles.
     # Otherwise, it's safe to go straight.
@@ -374,8 +322,28 @@ function close_to_wall() {
     return 0
 }
 
-
 # --------------- Remaining functions ---------------
+function C_eval(action) {
+
+    var error = action - pose.orientation.yaw
+    var speed =  base_speed/(math.abs(error) + 1)
+    # log("dt=",dt)
+    # Calculate our position one timestep later, given action:
+    var our_new_pos = { .x=pose.position.x + speed * dt * math.cos(action),
+                .y=pose.position.x + speed * dt * math.sin(action)}
+    # Sum the collision risk per neighbor to find the C_val of this action
+    var sum_c = neighbors.reduce(function(rid, data, accumulator) {
+        var neighbor_pose = {
+            .x = pose.position.x + data.distance * math.cos(data.elevation) * math.cos(data.azimuth),
+            .y = pose.position.y + data.distance * math.cos(data.elevation) * math.sin(data.azimuth),
+            .z = pose.position.z + data.distance * math.sin(data.elevation)
+        }
+        # log("neighbor=",n)
+        return math.exp(-DISTANCE_SENSITIVITY_FACTOR*(calc_dist(our_new_pos, neighbor_pose)-FOOTBOT_SIZE)) + accumulator
+    }, 0.0)
+    # log("sum_c=", sum_c, ", size(neighbor_list)=", neighbors.count())
+    return sum_c / (neighbors.count()+0.001)
+}
 
 function distance(neighbor, action) {
     # Not entirely sure about the best implementation here

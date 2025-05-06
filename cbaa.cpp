@@ -1,6 +1,7 @@
 #include "cbaa.h"
 #include "buzz/buzzvm.h"
 #include <argos3/plugins/robots/foot-bot/simulator/footbot_entity.h>
+#include <argos3/core/simulator/physics_engine/physics_engine.h>
 #include <map>
 #include <utility>
 
@@ -80,49 +81,58 @@
 //       BuzzTableClose(t_vm);
 //       /* Save assignment data */
 //       m_mapAssignments.insert(
-//          std::make_pair(str_robot_id, sAssignment));
-//    }
-
-//    size_t m_nTasks;
-//    std::map<std::string, SAssignment> m_mapAssignments;
-// };
-
-// /****************************************/
-/****************************************/
-
-// /**
-//  * Functor to put the task info in the Buzz VMs.
-//  */
-struct PutTables : public CBuzzLoopFunctions::COperation {
-
-   PutTables(const std::vector<STask>& nest_pair_var) : nest_pair_one(nest_pair_var) {}
+   //          std::make_pair(str_robot_id, sAssignment));
+   //    }
    
-   /** The action happens here */
-   virtual void operator()(const std::string& str_robot_id, buzzvm_t t_vm) {
-      /* Set the values of the table 'food' in the Buzz VM */
-      BuzzTableOpen(t_vm, "nest_pair_one");
-      /* Put (x,y) in the food table */
-      BuzzTableOpenNested(t_vm, "nest");
-      BuzzTablePut(t_vm, "x", static_cast<float>(nest_pair_one[0].Position.GetX()));
-      BuzzTablePut(t_vm, "y", static_cast<float>(nest_pair_one[0].Position.GetY()));
-      BuzzTablePut(t_vm, "radius", static_cast<float>(nest_pair_one[0].Radius));
-      /* Done with the food table */
-      BuzzTableCloseNested(t_vm);
-
-      /* Set the values of the table 'nest' in the Buzz VM */
-      BuzzTableOpenNested(t_vm, "food");
-      /* Put (x,y) in the nest table */
-      BuzzTablePut(t_vm, "x", static_cast<float>(nest_pair_one[1].Position.GetX()));
-      BuzzTablePut(t_vm, "y", static_cast<float>(nest_pair_one[1].Position.GetY()));
-      BuzzTablePut(t_vm, "radius", static_cast<float>(nest_pair_one[1].Radius));
-      /* Done with the nest table */
+   //    size_t m_nTasks;
+   //    std::map<std::string, SAssignment> m_mapAssignments;
+   // };
+   
+   // /****************************************/
+   /****************************************/
+   
+   // /**
+   //  * Functor to put the task info in the Buzz VMs.
+   //  */
+   struct PutTables : public CBuzzLoopFunctions::COperation {
+      
+      PutTables(const std::vector<STask>& nest_pair_var) : nest_pair_one(nest_pair_var) {}
+      
+      /** The action happens here */
+      virtual void operator()(const std::string& str_robot_id, buzzvm_t t_vm) {
+         /* Set the values of the table 'food' in the Buzz VM */
+         BuzzTableOpen(t_vm, "nest_pair_one");
+         /* Put (x,y) in the food table */
+         BuzzTableOpenNested(t_vm, "nest");
+         BuzzTablePut(t_vm, "x", static_cast<float>(nest_pair_one[0].Position.GetX()));
+         BuzzTablePut(t_vm, "y", static_cast<float>(nest_pair_one[0].Position.GetY()));
+         BuzzTablePut(t_vm, "radius", static_cast<float>(nest_pair_one[0].Radius));
+         /* Done with the food table */
+         BuzzTableCloseNested(t_vm);
+         
+         /* Set the values of the table 'nest' in the Buzz VM */
+         BuzzTableOpenNested(t_vm, "food");
+         /* Put (x,y) in the nest table */
+         BuzzTablePut(t_vm, "x", static_cast<float>(nest_pair_one[1].Position.GetX()));
+         BuzzTablePut(t_vm, "y", static_cast<float>(nest_pair_one[1].Position.GetY()));
+         BuzzTablePut(t_vm, "radius", static_cast<float>(nest_pair_one[1].Radius));
+         /* Done with the nest table */
       BuzzTableCloseNested(t_vm);
       /* Done with the tasks table */
       BuzzTableClose(t_vm);
    }
-
+   
    const std::vector<STask>& nest_pair_one;
 };
+struct PutSimClock : public CBuzzLoopFunctions::COperation {
+   /** The action happens here */
+   PutSimClock() {}
+
+   virtual void operator()(const std::string& str_robot_id, buzzvm_t t_vm) {
+      BuzzPut(t_vm, "dt", (float) CPhysicsEngine::GetSimulationClockTick());  
+   }
+};
+
 
 /****************************************/
 /****************************************/
@@ -233,6 +243,7 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
 void CCBAA::Reset() {
    // /* Tell all the robots about the tasks */
    BuzzForeachVM(PutTables(nest_pair_one));
+   BuzzForeachVM(PutSimClock());
 
    // /* Reset the output file */
    // m_cOutFile.open(m_strOutFile.c_str(),
@@ -333,8 +344,9 @@ void CCBAA::BuzzBytecodeUpdated() {
    /* Convey the stimuli to every robot */
    // BuzzForeachVM(PutTables(m_vecTasks));
    BuzzForeachVM(PutTables(nest_pair_one));
-}
+   BuzzForeachVM(PutSimClock());
 
+}
 /****************************************/
 /****************************************/
 
