@@ -95,35 +95,40 @@
 //  */
 struct PutTables : public CBuzzLoopFunctions::COperation {
 
-   /** Constructor */
-   Real food_x, food_y, nest_x, nest_y;
-   PutTables(CVector2& food_pos, CVector2& nest_pos) {
-      food_x = food_pos.GetX();
-      food_y = food_pos.GetY();
-      nest_x = nest_pos.GetX();
-      nest_y = nest_pos.GetY();
-   }
+   // /** Constructor */
+   // Real food_x, food_y, nest_x, nest_y;
+   // PutTables(const CVector2& food_pos, const CVector2& nest_pos) {
+   //    food_x = food_pos.GetX();
+   //    food_y = food_pos.GetY();
+   //    nest_x = nest_pos.GetX();
+   //    nest_y = nest_pos.GetY();
+   // }
+
+   PutTables(const std::vector<STask>& nest_pair_var) : nest_pair_one(nest_pair_var) {}
    
    /** The action happens here */
-   virtual void operator()(const std::string& str_robot_id,
-                           buzzvm_t t_vm) {
+   virtual void operator()(const std::string& str_robot_id, buzzvm_t t_vm) {
       /* Set the values of the table 'food' in the Buzz VM */
-      BuzzTableOpen(t_vm, "food");
+      BuzzTableOpen(t_vm, "nest_pair_one");
       /* Put (x,y) in the food table */
-      BuzzTablePut(t_vm, "x", static_cast<float>(food_x));
-      BuzzTablePut(t_vm, "y", static_cast<float>(food_y));
-      /* Done with the tasks table */
-      BuzzTableClose(t_vm);
+      BuzzTableOpenNested(t_vm, "food");
+      BuzzTablePut(t_vm, "x", static_cast<float>(nest_pair_one[0].Position.GetX()));
+      BuzzTablePut(t_vm, "y", static_cast<float>(nest_pair_one[0].Position.GetY()));
+      /* Done with the food table */
+      BuzzTableCloseNested(t_vm);
 
       /* Set the values of the table 'nest' in the Buzz VM */
-      BuzzTableOpen(t_vm, "nest");
+      BuzzTableOpenNested(t_vm, "nest");
       /* Put (x,y) in the nest table */
-      BuzzTablePut(t_vm, "x", static_cast<float>(nest_x));
-      BuzzTablePut(t_vm, "y", static_cast<float>(nest_y));
+      BuzzTablePut(t_vm, "x", static_cast<float>(nest_pair_one[1].Position.GetX()));
+      BuzzTablePut(t_vm, "y", static_cast<float>(nest_pair_one[1].Position.GetY()));
+      /* Done with the nest table */
+      BuzzTableCloseNested(t_vm);
       /* Done with the tasks table */
       BuzzTableClose(t_vm);
    }
 
+   const std::vector<STask>& nest_pair_one;
 };
 
 /****************************************/
@@ -148,12 +153,6 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
    GetNodeAttribute(t_tree, "nest_one_pos_y", nest_y);
    GetNodeAttribute(t_tree, "food_one_pos_x", food_x);
    GetNodeAttribute(t_tree, "food_one_pos_y", food_y);
-
-
-   CVector2 nest_one_pos;
-   nest_one_pos.Set(nest_x, nest_y);
-   CVector2 food_one_pos;
-   food_one_pos.Set(food_x, food_y);
 
 
    /* Create a new RNG */
@@ -210,16 +209,19 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
    nest_pair_one.resize(2);
    // nest_pair_two.resize(2);
 
-   CVector2 cPos;
+
+   CVector2 nest_one_pos;
+   nest_one_pos.Set(nest_x, nest_y);
+   CVector2 food_one_pos;
+   food_one_pos.Set(food_x, food_y);
    // nest one
    nest_pair_one[0].Position = nest_one_pos;
    // food one
    nest_pair_one[1].Position = food_one_pos;
-
-   // create a table that holds the nest and food positions
    
-
-
+   
+   
+   CVector2 cPos;
    // nest two
    // cPos.Set(0.0, -8.0);
    // nest_pair_two[0].Position = food_two_pos;
@@ -235,7 +237,8 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
 
 void CCBAA::Reset() {
    // /* Tell all the robots about the tasks */
-   BuzzForeachVM(PutTables(food_one_pos, nest_one_pos));
+   BuzzForeachVM(PutTables(nest_pair_one));
+
    // /* Reset the output file */
    // m_cOutFile.open(m_strOutFile.c_str(),
    //                 std::ofstream::out | std::ofstream::trunc);
@@ -245,9 +248,6 @@ void CCBAA::Reset() {
    // for(size_t j = 0; j < m_vecTasks.size(); ++j)
    //    m_cOutFile << "\t" << "y_i" << j;
    // m_cOutFile << std::endl;
-
-
-  
 }
 
 /****************************************/
@@ -337,7 +337,8 @@ int CCBAA::GetNumRobots() const {
 
 void CCBAA::BuzzBytecodeUpdated() {
    /* Convey the stimuli to every robot */
-   // BuzzForeachVM(PutTasks(m_vecTasks));
+   // BuzzForeachVM(PutTables(m_vecTasks));
+   BuzzForeachVM(PutTables(nest_pair_one));
 }
 
 /****************************************/

@@ -69,6 +69,7 @@ function init() {
         # We could access neighbor.state directly and skip the broadcast/listen setup
         neighbor_list[robot_id] = value
     })
+    log(TASK_RADIUS)
 }
 
 # Executed once every time step

@@ -252,7 +252,7 @@
     <qt-opengl>
       <camera>
         <placements>
-          <placement index="0" position="0,0,10" look_at="0,0,0" up="0,1,0" lens_focal_length="10" />
+          <placement index="0" position="0,0,10" look_at="0,0,0" up="0,1,0" lens_focal_length="42" />
         </placements>
       </camera>
       <user_functions label="buzz_qt" />
