@@ -102,7 +102,7 @@ struct PutTables : public CBuzzLoopFunctions::COperation {
       /* Set the values of the table 'food' in the Buzz VM */
       BuzzTableOpen(t_vm, "nest_pair_one");
       /* Put (x,y) in the food table */
-      BuzzTableOpenNested(t_vm, "food");
+      BuzzTableOpenNested(t_vm, "nest");
       BuzzTablePut(t_vm, "x", static_cast<float>(nest_pair_one[0].Position.GetX()));
       BuzzTablePut(t_vm, "y", static_cast<float>(nest_pair_one[0].Position.GetY()));
       BuzzTablePut(t_vm, "radius", static_cast<float>(nest_pair_one[0].Radius));
@@ -110,7 +110,7 @@ struct PutTables : public CBuzzLoopFunctions::COperation {
       BuzzTableCloseNested(t_vm);
 
       /* Set the values of the table 'nest' in the Buzz VM */
-      BuzzTableOpenNested(t_vm, "nest");
+      BuzzTableOpenNested(t_vm, "food");
       /* Put (x,y) in the nest table */
       BuzzTablePut(t_vm, "x", static_cast<float>(nest_pair_one[1].Position.GetX()));
       BuzzTablePut(t_vm, "y", static_cast<float>(nest_pair_one[1].Position.GetY()));
@@ -271,7 +271,7 @@ CColor CCBAA::GetFloorColor(const CVector2& c_position_on_plane) {
    }
 
    if((c_position_on_plane - nest_pair_one[1].Position).SquareLength() < TASK_RADIUS_2) {
-      return CColor::RED;
+      return CColor::GREEN;
    }
   
    // if((c_position_on_plane - nest_pair_two[0].Position).SquareLength() < TASK_RADIUS_2) {
