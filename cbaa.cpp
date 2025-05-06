@@ -93,38 +93,38 @@
 // /**
 //  * Functor to put the task info in the Buzz VMs.
 //  */
-// struct PutTasks : public CBuzzLoopFunctions::COperation {
+struct PutTables : public CBuzzLoopFunctions::COperation {
 
-//    /** Constructor */
-//    PutTasks(const std::vector<STask>& vec_tasks) : m_vecTasks(vec_tasks) {}
+   /** Constructor */
+   Real food_x, food_y, nest_x, nest_y;
+   PutTables(CVector2& food_pos, CVector2& nest_pos) {
+      food_x = food_pos.GetX();
+      food_y = food_pos.GetY();
+      nest_x = nest_pos.GetX();
+      nest_y = nest_pos.GetY();
+   }
    
-//    /** The action happens here */
-//    virtual void operator()(const std::string& str_robot_id,
-//                            buzzvm_t t_vm) {
-//       /* Set the values of the table 'tasks' in the Buzz VM */
-//       BuzzTableOpen(t_vm, "tasks");
-//       for(int i = 0; i < m_vecTasks.size(); ++i) {
-//          /* Create a nested table for this task, indexed numerically */
-//          BuzzTableOpenNested(t_vm, i);
-//          /* Create a nested table 'position' */
-//          BuzzTableOpenNested(t_vm, "position");
-//          /* Put (x,y) in the position table */
-//          BuzzTablePut(t_vm, "x", static_cast<float>(m_vecTasks[i].Position.GetX()));
-//          BuzzTablePut(t_vm, "y", static_cast<float>(m_vecTasks[i].Position.GetY()));
-//          /* Done with the position table */
-//          BuzzTableCloseNested(t_vm); // "position"
-//          /* Put the reward in the current task table */
-//          BuzzTablePut(t_vm, "reward", static_cast<float>(m_vecTasks[i].Reward));
-//          /* Done with the current task table */
-//          BuzzTableCloseNested(t_vm); // i
-//       }
-//       /* Done with the tasks table */
-//       BuzzTableClose(t_vm);
-//    }
+   /** The action happens here */
+   virtual void operator()(const std::string& str_robot_id,
+                           buzzvm_t t_vm) {
+      /* Set the values of the table 'food' in the Buzz VM */
+      BuzzTableOpen(t_vm, "food");
+      /* Put (x,y) in the food table */
+      BuzzTablePut(t_vm, "x", static_cast<float>(food_x));
+      BuzzTablePut(t_vm, "y", static_cast<float>(food_y));
+      /* Done with the tasks table */
+      BuzzTableClose(t_vm);
 
-//    /** Task info */
-//    const std::vector<STask>& m_vecTasks;
-// };
+      /* Set the values of the table 'nest' in the Buzz VM */
+      BuzzTableOpen(t_vm, "nest");
+      /* Put (x,y) in the nest table */
+      BuzzTablePut(t_vm, "x", static_cast<float>(nest_x));
+      BuzzTablePut(t_vm, "y", static_cast<float>(nest_y));
+      /* Done with the tasks table */
+      BuzzTableClose(t_vm);
+   }
+
+};
 
 /****************************************/
 /****************************************/
@@ -141,25 +141,26 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
    Real commsRange;
    GetNodeAttribute(t_tree, "commsRange", commsRange);
 
-   Real nest_one_pos_x, nest_one_pos_y;
-   Real food_one_pos_x, food_one_pos_y;
-   GetNodeAttribute(t_tree, "nest_one_pos_x", nest_one_pos_x);
-   GetNodeAttribute(t_tree, "nest_one_pos_y", nest_one_pos_y);
-   GetNodeAttribute(t_tree, "food_one_pos_x", food_one_pos_x);
-   GetNodeAttribute(t_tree, "food_one_pos_y", food_one_pos_y);
+   // Defined in cbaa.cpp now
+   Real nest_x, nest_y;
+   Real food_x, food_y;
+   GetNodeAttribute(t_tree, "nest_one_pos_x", nest_x);
+   GetNodeAttribute(t_tree, "nest_one_pos_y", nest_y);
+   GetNodeAttribute(t_tree, "food_one_pos_x", food_x);
+   GetNodeAttribute(t_tree, "food_one_pos_y", food_y);
 
 
    CVector2 nest_one_pos;
-   nest_one_pos.Set(nest_one_pos_x, nest_one_pos_y);
+   nest_one_pos.Set(nest_x, nest_y);
    CVector2 food_one_pos;
-   food_one_pos.Set(food_one_pos_x, food_one_pos_y);
+   food_one_pos.Set(food_x, food_y);
 
 
    /* Create a new RNG */
    m_pcRNG = CRandom::CreateRNG("argos");
 
    /* Place the robots randomly in the center of the environment */
-   CRange<Real> cRobotRange(-12.0,12.0);
+   CRange<Real> cRobotRange(-2,2);
    for(size_t i = 0; i < nRobots; ++i) {
 
       /* Pick an orientation at random */
@@ -225,23 +226,6 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
    // cPos.Set(0.0, 8.0);
    // nest_pair_two[1].Position = cPos;
 
-
-   // /* Generate the tasks */
-   // m_vecTasks.resize(nTasks);
-   // CRange<Real> cTaskRange(-5.0,5.0);
-   // for(int i = 0; i < m_vecTasks.size(); ++i) {
-   //    /* Pick a random position outside of the robot init area */
-   //    CVector2 cPos;
-   //    do {
-   //       cPos.Set(m_pcRNG->Uniform(cTaskRange),
-   //                m_pcRNG->Uniform(cTaskRange));
-   //    } while(cRobotRange.WithinMinBoundIncludedMaxBoundIncluded(cPos.GetX()) &&
-   //            cRobotRange.WithinMinBoundIncludedMaxBoundIncluded(cPos.GetY()));
-   //    /* Distribute the tasks uniformly in x and y */
-   //    m_vecTasks[i].Position = cPos;
-   //    /* Pick the task rewards uniformly */
-   //    m_vecTasks[i].Reward = m_pcRNG->Uniform(CRange(0.0, 1.0));
-   // }
    /* Finalize initialization */
    Reset();
 }
@@ -251,7 +235,7 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
 
 void CCBAA::Reset() {
    // /* Tell all the robots about the tasks */
-   // BuzzForeachVM(PutTasks(m_vecTasks));
+   BuzzForeachVM(PutTables(food_one_pos, nest_one_pos));
    // /* Reset the output file */
    // m_cOutFile.open(m_strOutFile.c_str(),
    //                 std::ofstream::out | std::ofstream::trunc);

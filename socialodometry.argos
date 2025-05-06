@@ -110,12 +110,12 @@
                   outfile="data.dat"
                   tasks="1"
                   robots="40"
-                  commsRange="4.0"
+                  commsRange="1"
                   msg_size="300"
-                  nest_one_pos_x="3.0"
-                  nest_one_pos_y="3.0"
-                  food_one_pos_x="-8.0"
-                  food_one_pos_y="-8.0">
+                  nest_one_pos_x="1.75"
+                  nest_one_pos_y="1.75"
+                  food_one_pos_x="-2"
+                  food_one_pos_y="-2">
 
   </loop_functions>  
 
@@ -138,20 +138,20 @@
 
       $ argos3 -q box
   -->
-  <arena size="25, 25, 1" center="0,0,0.5">x
+  <arena size="5, 5, 1" center="0,0,0.5">x
 
     <!-- Place four boxes in a square to delimit the arena -->
-    <box id="wall_north" size="25,0.1,0.5" movable="false">
-      <body position="0,12.5,0" orientation="0,0,0" />
+    <box id="wall_north" size="5,0.1,0.5" movable="false">
+      <body position="0,2.5,0" orientation="0,0,0" />
     </box>
-    <box id="wall_south" size="25,0.1,0.5" movable="false">
-      <body position="0,-12.5,0" orientation="0,0,0" />
+    <box id="wall_south" size="5,0.1,0.5" movable="false">
+      <body position="0,-2.5,0" orientation="0,0,0" />
     </box>
-    <box id="wall_east" size="0.1,25,0.5" movable="false">
-      <body position="12.5,0,0" orientation="0,0,0" />
+    <box id="wall_east" size="0.1,5,0.5" movable="false">
+      <body position="2.5,0,0" orientation="0,0,0" />
     </box>
-    <box id="wall_west" size="0.1,25,0.5" movable="false">
-      <body position="-12.5,0,0" orientation="0,0,0" />
+    <box id="wall_west" size="0.1,5,0.5" movable="false">
+      <body position="-2.5,0,0" orientation="0,0,0" />
     </box>
 
     <floor id="floor"

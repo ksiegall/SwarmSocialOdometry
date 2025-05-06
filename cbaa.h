@@ -72,6 +72,11 @@ private:
 
    /** Task data */
    // std::vector<STask> m_vecTasks;
+   // Real food_x, food_y, nest_x, nest_y;
+
+   CVector2 nest_one_pos;
+   CVector2 food_one_pos;
+   
    std::vector<STask> nest_pair_one;
    std::vector<STask> nest_pair_two;
 

@@ -1,0 +1,378 @@
+include "vec2.bzz"
+
+# THESE TWO SHOULD REALLY BE RANDOMLY PLACED FROM THE C LOOP FUNCTIONS
+# also manually change it in the socialodometry.argos file, as it is hardcoded
+# everything is in SI units, and meters [but buzz internally is in cm, for some reason]
+NEST = {.x = 1.75, .y = 1.75}     # purple
+FOOD = {.x = -2.0, .y = -2.0}   # red
+
+# --------------- Parameters ---------------
+
+NEST_FOOD_POSITION_RADIUS = 1.
+SIGNAL_DECAY_RATE = 0.02
+CONFIDENCE_THRESHOLD = 0.1 # if below this, ignore the signals
+BETA = 0.001 # used to merge confidence values
+
+# First pair is weights when navigating to food
+# Second pair is weights when navigating to home
+# priorities are: food, home, exploration
+priorities = { .0 = {.0 = 0.7, .1 = 0.1, .2=0.2}, .1 = {.0=0.1, .1=0.7, .2=0.2} }
+COLLISION_AVOIDANCE_COEFF = 0.0
+DISTANCE_SENSITIVITY_FACTOR = 2.5
+
+# collision avoidance parameters
+ANGLE_THRESHOLD = math.pi / 2
+LENGTH_THRESHOLD = 0.0
+
+# tracking the performance of the swarm
+food_recovered = 0
+
+base_speed = 25
+
+# generate possible actions array around the circle
+actions_angle = {}
+NUM_ANGLE_DIVISIONS = 20.0
+for (i = 0, i < NUM_ANGLE_DIVISIONS, i = i + 1) {
+    actions_angle[i] = i * (2*math.pi / NUM_ANGLE_DIVISIONS) - math.pi
+}
+
+
+# --------------- BUZZ ---------------
+ 
+
+# Executed once when the robot is spawned in the arena
+function init() {
+    VALUE_OF_EXPLORATION = (id % NUM_ANGLE_DIVISIONS)
+    approx_food_pos = {.x=0.0, .y=0.0}
+    approx_home_pos = {.x=0.0, .y=0.0}
+    # Table that gets communicated
+    state = {
+        .heading_food = 0.0,  # heading to food, calculated to be in the global heading frame
+        .dist_food = 0.0,     
+        .conf_food = 0.0,    # weight of food signal (confidence)
+        .heading_home = 0.0,  # heading to home, calculated to be in the global heading frame
+        .dist_home = 0.0,
+        .conf_home = 0.0    # weight of home signal (confidence)
+    }   
+    
+    # Decision making mode
+    # If no food, find food, if food, go home
+    has_food = 0
+    # How to represent incoming information from neighbors?
+    # TODO: UPDATE TO USE STIGMERGY IN THE FUTURE
+    neighbor_list = {}
+    neighbors.listen("/state", function(value_id, value, robot_id){
+        # Pinci originally was confused about the purpose of this but 
+        # his proposed solution wasn't significantly different
+
+        # However, if we were to use neighbors.reduce or neighbors.map instead of foreach
+        # We could access neighbor.state directly and skip the broadcast/listen setup
+        neighbor_list[robot_id] = value
+    })
+}
+
+# Executed once every time step
+function step() {
+    if(size(neighbor_list) > 0){
+
+        valid_neighbors_food = 0.0
+        valid_neighbors_home = 0.0
+
+        # if we start it with our values, they will propagate with confidence to reach a "global consensus" on where the food and nest are
+
+        # Decay our confidence a little before averaging everything together
+        state.conf_food = (1.0 - SIGNAL_DECAY_RATE) * state.conf_food
+        state.conf_food = state.conf_food * (1.0 - SIGNAL_DECAY_RATE)
+        consensus_approx_food_x = approx_food_pos.x * state.conf_food
+        consensus_approx_food_y = approx_food_pos.y * state.conf_food
+        consensus_conf_food = consensus_conf_food
+
+        state.conf_home = state.conf_home * (1.0 - SIGNAL_DECAY_RATE)
+        consensus_approx_home_x = approx_home_pos.x * state.conf_home
+        consensus_approx_home_y = approx_home_pos.y * state.conf_home
+        consensus_conf_home = consensus_conf_home
+
+
+        # log("Robot ", id, ": ", "consensus_conf_food: ", consensus_conf_food, ", consensus_conf_home: ", consensus_conf_home)
+        # Update conf_food and conf_home based on neighbors values
+        neighbors.foreach(function(rid, data) {
+            # Sanity check communication azimuth direction
+            # log("robot ", rid, ": ",
+            #     "distance  = ", data.distance, ", ",
+            #     "azimuth   = ", data.azimuth, ", ",
+            #     )
+
+            # everything be in meters; robot positions are in global frame, so math.cos(azimuth_rab + robot.yaw)
+            if(neighbor_list[rid].conf_home > CONFIDENCE_THRESHOLD) {
+                valid_neighbors_home = valid_neighbors_home + 1.0
+                var theta_j_home = neighbor_list[rid].heading_home
+                var azim_global = data.azimuth + pose.orientation.yaw 
+                # log("Has heading home: ", theta_j_home, " with dist: ", neighbor_list[rid].dist_home, " gamma_j ", data.azimuth, " dij ", data.distance/100.0)
+                # shortcut a bit, rotation angle from receiving robot j heading to home heading
+                var x_home = data.distance/100.0 * math.cos(azim_global) + neighbor_list[rid].dist_home * math.cos(theta_j_home) + pose.position.x
+                var y_home = data.distance/100.0 * math.sin(azim_global) + neighbor_list[rid].dist_home * math.sin(theta_j_home) + pose.position.y
+
+                # log("I ", rid, " think home is at: ", x_home, ", ", y_home, " with confidence: ", neighbor_list[rid].conf_home)
+
+                # swap to Fermi function and beta confidence merging
+                var neighbor_conf = neighbor_list[rid].conf_home
+                var c = 1.0 / (1.0 + math.exp(-BETA * (neighbor_conf - state.conf_home)))
+                consensus_approx_home_x = c * consensus_approx_home_x  + (1.0 - c) * x_home
+                consensus_approx_home_y = c * consensus_approx_home_y + (1.0 - c) * y_home
+                state.conf_home = c * state.conf_home + (1.0 - c) * neighbor_conf
+
+            }
+
+            if(neighbor_list[rid].conf_food > CONFIDENCE_THRESHOLD) {
+                valid_neighbors_food = valid_neighbors_food + 1.0
+                # implemented 4.2 equation from paper  https://link.springer.com/chapter/10.1007/978-3-540-87527-7_39
+                # robot i is transmitting, robot j is receiving
+                var theta_j_food = neighbor_list[rid].heading_food
+                var azim_global = data.azimuth + pose.orientation.yaw 
+                # shortcut a bit, rotation angle from receiving robot j heading to food heading; add robot position to convert from relative to global frame
+                var x_food = data.distance/100.0 * math.cos(azim_global) + neighbor_list[rid].dist_food * math.cos(theta_j_food) + pose.position.x
+                var y_food = data.distance/100.0 * math.sin(azim_global) + neighbor_list[rid].dist_food * math.sin(theta_j_food) + pose.position.y
+
+                # swap to Fermi function and beta confidence merging
+                var neighbor_conf = neighbor_list[rid].conf_food
+                var c = 1.0 / (1.0 + math.exp(-BETA * (neighbor_conf - state.conf_food)))
+                consensus_approx_food_x = c * consensus_approx_food_x + (1.0 - c) * x_food
+                consensus_approx_food_y = c * consensus_approx_food_y + (1.0 - c) * y_food
+                state.conf_food = c * state.conf_food + (1.0 - c) * neighbor_conf
+
+            }
+        })
+        
+        # Log intermediate consensus values
+        # log("Robot ", id, ": ", "Consensus_sum_food_x: ", consensus_approx_food_x, ", Consensus_sum_food_y: ", 
+        #     consensus_approx_food_y, ", Consensus_sum_conf_food: ", consensus_conf_food,
+        #     ", Consensus_sum_home_x: ", consensus_approx_home_x, ", Consensus_sum_home_y: ", 
+        #     consensus_approx_home_y, ", Consensus_sum_conf_home: ", consensus_conf_home)
+
+        if(valid_neighbors_home > 0) {
+
+            # consensus fermi
+            # log("Robot ", id, ": ", "concensus_approx_home_x: ", consensus_approx_home_x, 
+            #     ", concensus_approx_home_y: ", consensus_approx_home_y, 
+            #     ", consensus_conf_home: ", consensus_conf_home)
+            approx_home_pos.x = consensus_approx_home_x
+            approx_home_pos.y = consensus_approx_home_y
+
+            # var raw_hconf = consensus_conf_home / valid_neighbors_home
+            # raw_hconf = math.min(1.0, math.max(0.0, raw_hconf))
+            # # delta between new and old pooled
+            # var delta_h = raw_hconf - state.conf_home
+            # # avoid exp() overflow
+            # delta_h = math.min(50.0, math.max(-50.0, delta_h))
+            # var c_h = 1.0 / (1.0 + math.exp(-BETA * delta_h))
+
+            # var pooled_hx = consensus_approx_home_x / consensus_conf_home
+            # var pooled_hy = consensus_approx_home_y / consensus_conf_home 
+            # var c = 1.0 / (1.0 + math.exp(-BETA * (consensus_conf_home - state.conf_home)))
+            # approx_home_pos.x = c_h * approx_home_pos.x + (1.0 - c_h) * pooled_hx
+            # approx_home_pos.y = c_h * approx_home_pos.y + (1.0 - c_h) * pooled_hy
+            # state.conf_home = c_h * state.conf_home + (1.0 - c_h) * raw_hconf
+        }
+
+        if(valid_neighbors_food > 0) {
+
+            # consensus fermi
+            approx_food_pos.x = consensus_approx_food_x
+            approx_food_pos.y = consensus_approx_food_y
+
+            # var raw_fconf = consensus_conf_food / valid_neighbors_food
+            # raw_fconf = math.min(1.0, math.max(0.0, raw_fconf))
+            # var delta_f = raw_fconf - state.conf_food
+            # delta_f = math.min(50.0, math.max(-50.0, delta_f))
+            # var c_f = 1.0 / (1.0 + math.exp(-BETA * delta_f))
+
+            # var pooled_fx = consensus_approx_food_x / consensus_conf_food
+            # var pooled_fy = consensus_approx_food_y / consensus_conf_food
+
+            # approx_food_pos.x = c_f * approx_food_pos.x + (1.0 - c_f) * pooled_fx
+            # approx_food_pos.y = c_f * approx_food_pos.y + (1.0 - c_f) * pooled_fy
+            # state.conf_food   = c_f * state.conf_food   + (1.0 - c_f) * raw_fconf
+        }
+    }
+    
+    # If home or food found (and that was what we were looking for)
+    # Set conf_home or conf_food to 1 and flip has_food
+    # and increment food_recovered
+    # food_recovered = food_recovered += 1
+    if(calc_dist(pose.position, NEST) < NEST_FOOD_POSITION_RADIUS) {
+        # Nest found
+        if(has_food) {
+            has_food = 0
+            food_recovered = food_recovered + 1
+        }
+        approx_home_pos = {.x = NEST.x, .y = NEST.y }
+        state.conf_home = 1
+    } 
+    else if(calc_dist(pose.position, FOOD) < NEST_FOOD_POSITION_RADIUS) {
+        # Food found
+        if(not has_food) {
+            has_food = 1
+        }
+        approx_food_pos = {.x = FOOD.x, .y = FOOD.y }
+        state.conf_food = 1
+    }
+
+    # log("Robot ", id, ": ", "conf_food = ", state.conf_food, ", x_food = ", approx_food_pos.x, ", y_food = ", approx_food_pos.y, 
+    # ", conf_nest = ", state.conf_home, ", x_nest = ", approx_home_pos.x, ", y_nest = ", approx_home_pos.y)
+    
+    # approx_food_pos
+    diff_y_food = approx_food_pos.y - pose.position.y
+    diff_x_food = approx_food_pos.x - pose.position.x
+    state.heading_food = math.atan(approx_food_pos.y - pose.position.y, approx_food_pos.x - pose.position.x)
+    state.dist_food = math.sqrt(diff_y_food^2 + diff_x_food^2)
+
+    # approx_home_pos
+    diff_y_home = approx_home_pos.y - pose.position.y
+    diff_x_home = approx_home_pos.x - pose.position.x
+    state.heading_food = math.atan(approx_home_pos.y - pose.position.y, approx_home_pos.x - pose.position.x)
+    state.dist_food = math.sqrt(diff_y_home^2 + diff_x_home^2)
+    
+    # Choose the best action to take, estimate the value of each action
+    var action_values = {}
+    var food_priority = priorities[has_food][0]*state.conf_food
+    var home_priority = priorities[has_food][1]*state.conf_home 
+    var explore_priority = priorities[has_food][2]
+
+    foreach(actions_angle, function(key, action){
+
+        # TBH I do not trust this part of the code
+        # If the reason our shit doesn't work is us and not the paper
+        # then its almost certainly coming from here
+
+        # Evaluate priorities
+        action_val = food_priority*math.cos(action - state.heading_food) + home_priority*math.cos(action - state.heading_home)
+        # Each robot has its preferred exploration direction (based on its id)
+        action_val = action_val - explore_priority * math.abs(key - VALUE_OF_EXPLORATION) / NUM_ANGLE_DIVISIONS
+
+        #   Start without collision avoidance
+        # action_val = action_val - COLLISION_AVOIDANCE_COEFF*C_eval(action) 
+        #   Save resulting weight
+        
+
+        # action = heading
+        # action_val = score per heading
+        action_values[action] = action_val
+    })
+
+    # Change the exploration value to prefer a different direction, slowly over time
+    if (close_to_wall()) {
+        VALUE_OF_EXPLORATION = ((VALUE_OF_EXPLORATION + 0.2)) % NUM_ANGLE_DIVISIONS
+    }
+
+    # Grab the argmax action, do it
+    desired_heading = argmax(action_values)
+    
+    # Driving code:
+    #   Slows down based on the curvature of the path
+    error = desired_heading - pose.orientation.yaw
+    var kp = 3
+    set_wheels(base_speed/(math.abs(error)+1) - kp*error, base_speed/(math.abs(error)+1) + kp*error)
+    # log("Error: ", error, " Desired heading: ", desired_heading, " Current heading: ", pose.orientation.yaw)
+    
+
+    # broadcast conf_food, conf_home, dirs, current heading
+    neighbors.broadcast("/state", state)   
+     
+    if(has_food == 0){
+        # looking for food, blue LED
+        set_leds(30, 30, 255)
+    } else {
+        # looking for home, green LED
+       set_leds(30, 255, 30)
+    }
+
+    neighbor_list = {}
+}
+
+
+
+# --------------- Helper functions ---------------
+
+function C_eval(action) {
+    # Sum the collision risk per neighbor to find the C_val of this action
+    sum_c = reduce(neighbor_list, function(n, accumulator) {
+        return math.exp(-distance(n, action) / (2*DISTANCE_SENSITIVITY_FACTOR^2)) + accumulator
+    })
+}
+
+function argmax(table){
+    return arg_compare(table, function(a,b){return a>b})
+}
+
+function argmin(table){
+    return arg_compare(table, function(a,b){return a<b})
+}
+
+# Using Argos and Buzz’s “language” is like being tasked with building Buckingham Palace out of soggy crumpets
+#    - no arrays, no lists, and about as functional as a chocolate teapot, leaving you desperate for a proper cuppa just to soothe the soul-crushing despair [/s]
+
+function arg_compare(t, cmp) {
+    var am = reduce(t, function(k,v,m){
+      if((not m) or cmp(m.max,v)) return { .argmax=k, .max=v }
+      return m
+    }, nil)
+    return am.argmax
+  }
+
+function calc_dist(pos1, pos2) {
+    # Calculate the distance between two positions
+    return math.sqrt((pos1.x - pos2.x)^2 + (pos1.y - pos2.y)^2)
+}
+
+function close_to_wall() {
+# driving code from prior homework
+    # Transform the proximity readings into vectors
+    proximity_vec2 = map(proximity,
+    function(index,reading) {
+        return math.vec2.newp(reading.value, reading.angle)	
+    })
+
+    # Sum the vectors to find the obstacles to avoid
+    accumulator = reduce(proximity_vec2,
+    function(index,value,acc) {
+        return math.vec2.add(value, acc)
+    },
+    math.vec2.new(0.0, 0.0))
+
+    # Divide by the number of proximity readings
+    accumulator = math.vec2.scale(accumulator, 1.0 / size(proximity))
+    length = math.vec2.length(accumulator)
+    angle = math.vec2.angle(accumulator)
+
+    # If the angle of the accumulator is within a certain threshold and its length
+    # is beyond another, we need to avoid  the obstacles.
+    # Otherwise, it's safe to go straight.
+    if((math.abs(angle) < ANGLE_THRESHOLD) and (length > LENGTH_THRESHOLD)) {
+        return 1
+    }
+    return 0
+}
+
+
+# --------------- Remaining functions ---------------
+
+function distance(neighbor, action) {
+    # Not entirely sure about the best implementation here
+    # could pull the real position of the robots to get the distance between them?
+    # the real goal is moreso to show how the distance between the two robots will *change* given this action
+    return 0
+}
+
+# Executed when you press the Reset button in the simulation window
+function reset() {
+}
+
+# Executed once when the robot is removed from the arena
+function destroy() {
+}
+
+# function debug_log(str) {
+#     if (id % 10 == 0) {
+#         log(str)
+#     }
+# }
