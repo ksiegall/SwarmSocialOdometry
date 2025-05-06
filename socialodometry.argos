@@ -115,7 +115,8 @@
                   nest_one_pos_x="1.75"
                   nest_one_pos_y="1.75"
                   food_one_pos_x="-2"
-                  food_one_pos_y="-2">
+                  food_one_pos_y="-2"
+                  radius="1.2">
 
   </loop_functions>  
 

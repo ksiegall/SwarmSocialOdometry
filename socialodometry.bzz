@@ -1,14 +1,7 @@
 include "vec2.bzz"
 
-# THESE TWO SHOULD REALLY BE RANDOMLY PLACED FROM THE C LOOP FUNCTIONS
-# also manually change it in the socialodometry.argos file, as it is hardcoded
-# everything is in SI units, and meters [but buzz internally is in cm, for some reason]
-NEST = {.x = 1.75, .y = 1.75}     # purple
-FOOD = {.x = -2.0, .y = -2.0}   # red
-
 # --------------- Parameters ---------------
 
-NEST_FOOD_POSITION_RADIUS = 1.
 SIGNAL_DECAY_RATE = 0.02
 CONFIDENCE_THRESHOLD = 0.1 # if below this, ignore the signals
 BETA = 0.001 # used to merge confidence values
@@ -69,7 +62,6 @@ function init() {
         # We could access neighbor.state directly and skip the broadcast/listen setup
         neighbor_list[robot_id] = value
     })
-    log(TASK_RADIUS)
 }
 
 # Executed once every time step
@@ -200,21 +192,21 @@ function step() {
     # Set conf_home or conf_food to 1 and flip has_food
     # and increment food_recovered
     # food_recovered = food_recovered += 1
-    if(calc_dist(pose.position, NEST) < NEST_FOOD_POSITION_RADIUS) {
+    if(calc_dist(pose.position, nest_pair_one.nest) < nest_pair_one.nest.radius) {
         # Nest found
         if(has_food) {
             has_food = 0
             food_recovered = food_recovered + 1
         }
-        approx_home_pos = {.x = NEST.x, .y = NEST.y }
+        approx_home_pos = {.x = nest_pair_one.nest.x, .y = nest_pair_one.nest.nestEST.y }
         state.conf_home = 1
     } 
-    else if(calc_dist(pose.position, FOOD) < NEST_FOOD_POSITION_RADIUS) {
+    else if(calc_dist(pose.position, nest_pair_one.food) < nest_pair_one.food.radius) {
         # Food found
         if(not has_food) {
             has_food = 1
         }
-        approx_food_pos = {.x = FOOD.x, .y = FOOD.y }
+        approx_food_pos = {.x = nest_pair_one.food.x, .y = nest_pair_one.food.y }
         state.conf_food = 1
     }
 

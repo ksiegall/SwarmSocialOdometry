@@ -5,7 +5,7 @@
 
 struct STask {
    CVector2 Position; ///< where the task is located
-   Real Reward;       ///< the reward received for completing the task
+   Real Radius;       ///< Radius of the task
 };
 
 struct SAssignment {

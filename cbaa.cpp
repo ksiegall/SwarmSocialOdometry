@@ -95,15 +95,6 @@
 //  */
 struct PutTables : public CBuzzLoopFunctions::COperation {
 
-   // /** Constructor */
-   // Real food_x, food_y, nest_x, nest_y;
-   // PutTables(const CVector2& food_pos, const CVector2& nest_pos) {
-   //    food_x = food_pos.GetX();
-   //    food_y = food_pos.GetY();
-   //    nest_x = nest_pos.GetX();
-   //    nest_y = nest_pos.GetY();
-   // }
-
    PutTables(const std::vector<STask>& nest_pair_var) : nest_pair_one(nest_pair_var) {}
    
    /** The action happens here */
@@ -114,6 +105,7 @@ struct PutTables : public CBuzzLoopFunctions::COperation {
       BuzzTableOpenNested(t_vm, "food");
       BuzzTablePut(t_vm, "x", static_cast<float>(nest_pair_one[0].Position.GetX()));
       BuzzTablePut(t_vm, "y", static_cast<float>(nest_pair_one[0].Position.GetY()));
+      BuzzTablePut(t_vm, "radius", static_cast<float>(nest_pair_one[0].Radius));
       /* Done with the food table */
       BuzzTableCloseNested(t_vm);
 
@@ -122,6 +114,7 @@ struct PutTables : public CBuzzLoopFunctions::COperation {
       /* Put (x,y) in the nest table */
       BuzzTablePut(t_vm, "x", static_cast<float>(nest_pair_one[1].Position.GetX()));
       BuzzTablePut(t_vm, "y", static_cast<float>(nest_pair_one[1].Position.GetY()));
+      BuzzTablePut(t_vm, "radius", static_cast<float>(nest_pair_one[1].Radius));
       /* Done with the nest table */
       BuzzTableCloseNested(t_vm);
       /* Done with the tasks table */
@@ -149,10 +142,12 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
    // Defined in cbaa.cpp now
    Real nest_x, nest_y;
    Real food_x, food_y;
+   Real radius;
    GetNodeAttribute(t_tree, "nest_one_pos_x", nest_x);
    GetNodeAttribute(t_tree, "nest_one_pos_y", nest_y);
    GetNodeAttribute(t_tree, "food_one_pos_x", food_x);
    GetNodeAttribute(t_tree, "food_one_pos_y", food_y);
+   GetNodeAttribute(t_tree, "radius", radius);
 
 
    /* Create a new RNG */
@@ -216,12 +211,12 @@ void CCBAA::Init(TConfigurationNode& t_tree) {
    food_one_pos.Set(food_x, food_y);
    // nest one
    nest_pair_one[0].Position = nest_one_pos;
+   nest_pair_one[0].Radius = radius;
    // food one
    nest_pair_one[1].Position = food_one_pos;
+   nest_pair_one[1].Radius = radius;
    
-   
-   
-   CVector2 cPos;
+   // CVector2 cPos;
    // nest two
    // cPos.Set(0.0, -8.0);
    // nest_pair_two[0].Position = food_two_pos;
@@ -260,17 +255,16 @@ void CCBAA::Destroy() {
 /****************************************/
 /****************************************/
 
-static Real TASK_RADIUS = 1;
-static Real TASK_RADIUS_2 = TASK_RADIUS * TASK_RADIUS;
-
-
+// static Real TASK_RADIUS = 1;
+// static Real TASK_RADIUS_2 = TASK_RADIUS * TASK_RADIUS;
 CColor CCBAA::GetFloorColor(const CVector2& c_position_on_plane) {
    // for(UInt32 i = 0; i < m_vecTasks.size(); ++i) {
       //    if((c_position_on_plane - m_vecTasks[i].Position).SquareLength() < TASK_RADIUS_2) {
          //       return CColor::BLACK;
          //    }
          // }
-      
+   Real TASK_RADIUS_2 = nest_pair_one[0].Radius * nest_pair_one[0].Radius;
+
    // define the nest and food position vector
    if((c_position_on_plane - nest_pair_one[0].Position).SquareLength() < TASK_RADIUS_2) {
       return CColor::PURPLE;
