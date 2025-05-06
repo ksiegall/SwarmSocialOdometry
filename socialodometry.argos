@@ -13,7 +13,7 @@
           the computation is not parallelized: the main thread does
           everything.
     -->
-    <system threads="0" />
+    <system threads="5" />
     <!--
         Experiment configuration:
         - length: total experiment time in seconds (0 means the experiment
@@ -109,14 +109,14 @@
                   label="socialodometry"
                   outfile="data.dat"
                   tasks="1"
-                  robots="40"
+                  robots="60"
                   commsRange="1"
                   msg_size="300"
                   nest_one_pos_x="1.75"
                   nest_one_pos_y="1.75"
                   food_one_pos_x="-2"
                   food_one_pos_y="-2"
-                  radius="1.2">
+                  radius="1.25">
 
   </loop_functions>  
 
