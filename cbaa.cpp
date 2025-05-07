@@ -54,39 +54,54 @@
 /**
  * Functor to get data from the robots
  */
-// struct GetRobotData : public CBuzzLoopFunctions::COperation {
+struct GetRobotData : public CBuzzLoopFunctions::COperation {
 
-//    /** Constructor */
-//    GetRobotData(size_t n_tasks) : m_nTasks(n_tasks) {}
+   /** Constructor */
+   // GetRobotData(size_t n_tasks) : m_nTasks(n_tasks) {}
 
-//    /** The action happens here */
-//    virtual void operator()(const std::string& str_robot_id,
-//                            buzzvm_t t_vm) {
-//       /* Empty assignment to fill */
-//       SAssignment sAssignment(m_nTasks);
-//       /* Make sure 'xi' and 'yi' exist and are vectors */
-//       BuzzAssertVector(t_vm, "xi");
-//       BuzzAssertVector(t_vm, "yi");
-//       /* Extract data from xi */
-//       BuzzTableOpen(t_vm, "xi");
-//       for(size_t j = 0; j < m_nTasks; ++j) {
-//          sAssignment.xi[j] = BuzzFetchXij(t_vm, j);
-//       }
-//       BuzzTableClose(t_vm);
-//       /* Extract data from yi */
-//       BuzzTableOpen(t_vm, "yi");
-//       for(size_t j = 0; j < m_nTasks; ++j) {
-//          sAssignment.yi[j] = BuzzFetchYij(t_vm, j);
-//       }
-//       BuzzTableClose(t_vm);
-//       /* Save assignment data */
-//       m_mapAssignments.insert(
+   /*
+      THINGS WE NEED HERE:
+      - (x,y)
+      - state:
+         - approx_food (x,y), confidence
+         - approx_home (x,y), confidence
+      - food_recovered (per robot, analyze in post)
+      - [dist_to_neighbor] array (used for aggregation analysis)
+            - Needs to be added to buzz too
+
+      OTHER:
+      - log time
+   */
+   
+   /** The action happens here */
+   virtual void operator()(const std::string& str_robot_id,
+                           buzzvm_t t_vm) {
+   }
+   //    /* Empty assignment to fill */
+   //    SAssignment sAssignment(m_nTasks);
+   //    /* Make sure 'xi' and 'yi' exist and are vectors */
+   //    BuzzAssertVector(t_vm, "xi");
+   //    BuzzAssertVector(t_vm, "yi");
+   //    /* Extract data from xi */
+   //    BuzzTableOpen(t_vm, "xi");
+   //    for(size_t j = 0; j < m_nTasks; ++j) {
+   //       sAssignment.xi[j] = BuzzFetchXij(t_vm, j);
+   //    }
+   //    BuzzTableClose(t_vm);
+   //    /* Extract data from yi */
+   //    BuzzTableOpen(t_vm, "yi");
+   //    for(size_t j = 0; j < m_nTasks; ++j) {
+   //       sAssignment.yi[j] = BuzzFetchYij(t_vm, j);
+   //    }
+   //    BuzzTableClose(t_vm);
+   //    /* Save assignment data */
+   //    m_mapAssignments.insert(
    //          std::make_pair(str_robot_id, sAssignment));
    //    }
    
    //    size_t m_nTasks;
    //    std::map<std::string, SAssignment> m_mapAssignments;
-   // };
+   };
    
    // /****************************************/
    /****************************************/
@@ -303,8 +318,8 @@ void CCBAA::PostStep() {
    // /* Get robot data */
    // GetRobotData cGetRobotData(m_vecTasks.size());
    // BuzzForeachVM(cGetRobotData);
-   // /* Write it to the output file */
-   // /* Go through each robot */
+   /* Write it to the output file */
+   /* Go through each robot */
    // for(auto i = cGetRobotData.m_mapAssignments.begin();
    //     i != cGetRobotData.m_mapAssignments.end();
    //     ++i) {
