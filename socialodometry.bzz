@@ -1,32 +1,32 @@
 include "vec2.bzz"
 
 # --------------- Parameters ---------------
-TARGET_POS_DEVIATION = 0.3
-SIGNAL_ATTENUATION_RATE = 0.98
-CONFIDENCE_THRESHOLD = 0.1 # if below this, ignore the signals
-BETA = 10.0 # used to merge confidence values
+var TARGET_POS_DEVIATION = 0.3
+var SIGNAL_ATTENUATION_RATE = 0.98
+var CONFIDENCE_THRESHOLD = 0.1 # if below this, ignore the signals
+var BETA = 10.0 # used to merge confidence values
 
 # First pair is weights when navigating to food
 # Second pair is weights when navigating to home
 # priorities are: food, home, exploration
-priorities = { .0 = {.0 = 0.7, .1 = 0.1, .2=0.2}, .1 = {.0=0.1, .1=0.7, .2=0.2} }
-BIAS_THRESHOLD = 0.25
+var priorities = { .0 = {.0 = 0.7, .1 = 0.1, .2=0.2}, .1 = {.0=0.1, .1=0.7, .2=0.2} }
+var BIAS_THRESHOLD = 0.25
 
 # collision avoidance parameters
-ANGLE_THRESHOLD = math.pi / 2
-LENGTH_THRESHOLD = 0.15
-base_speed = 12
-FOOTBOT_SIZE = 0.17 # Minimum distance between robots
+var ANGLE_THRESHOLD = math.pi / 2
+var LENGTH_THRESHOLD = 0.15
+var base_speed = 12
+var FOOTBOT_SIZE = 0.17 # Minimum distance between robots
 
-COLLISION_AVOIDANCE_COEFF = 1
-DISTANCE_SENSITIVITY_FACTOR = 2.5
+var COLLISION_AVOIDANCE_COEFF = 4.
+var DISTANCE_SENSITIVITY_FACTOR = 2.5
 
 # tracking the performance of the swarm
 food_recovered = 0
 
 # generate possible actions array around the circle
-actions_angle = {}
-NUM_ANGLE_DIVISIONS = 12.0
+var actions_angle = {}
+var NUM_ANGLE_DIVISIONS = 20.0
 for (i = 0, i < NUM_ANGLE_DIVISIONS, i = i + 1) {
     actions_angle[i] = i * (2*math.pi / NUM_ANGLE_DIVISIONS) - math.pi
 }
@@ -35,7 +35,7 @@ for (i = 0, i < NUM_ANGLE_DIVISIONS, i = i + 1) {
 # --------------- BUZZ ---------------
 # Executed once when the robot is spawned in the arena
 function init() {
-    VALUE_OF_EXPLORATION = (id % NUM_ANGLE_DIVISIONS)
+    VALUE_OF_EXPLORATION = actions_angle[(id % NUM_ANGLE_DIVISIONS)]
     approx_food_pos = {.x=0.0, .y=0.0}
     approx_home_pos = {.x=0.0, .y=0.0}
     # Table that gets communicated
@@ -212,7 +212,7 @@ function step() {
     state.dist_home = math.sqrt(diff_y_home^2 + diff_x_home^2)
     
     # Choose the best action to take, estimate the value of each action
-    var action_values = {}
+    action_values = {}
     var food_priority = priorities[has_food][0] * state.conf_food
     var home_priority = priorities[has_food][1] * state.conf_home 
     var explore_priority = priorities[has_food][2]
@@ -222,16 +222,16 @@ function step() {
         action_val = food_priority * (0.5*math.cos(action - state.heading_food)+ 0.5)
         action_val = action_val + home_priority * (0.5*math.cos(action - state.heading_home)+ 0.5)
         # Each robot has its preferred exploration direction (based on its id)
-        action_val = action_val + explore_priority * (0.5*math.cos(action - actions_angle[VALUE_OF_EXPLORATION])+ 0.5)
+        action_val = action_val + explore_priority * (0.5*math.cos(action - VALUE_OF_EXPLORATION)+ 0.5)
 
         #   Start without collision avoidance
-        action_val = action_val + COLLISION_AVOIDANCE_COEFF*(1 - C_eval(action)) 
+        action_val = action_val + COLLISION_AVOIDANCE_COEFF*(1. - C_eval(action)) 
         action_values[action] = action_val
     })
 
     # Change the exploration value to prefer a different direction, slowly over time
     if (close_to_wall()) {
-        VALUE_OF_EXPLORATION = ((VALUE_OF_EXPLORATION + 1)) % NUM_ANGLE_DIVISIONS
+        VALUE_OF_EXPLORATION = ((VALUE_OF_EXPLORATION + 0.1)) % (2*math.pi)
     }
 
     # Grab the argmax action, do it
@@ -242,15 +242,16 @@ function step() {
     if(id == 0){
         log("Food: ", food_priority*(0.5*math.cos(desired_heading - state.heading_food)+0.5),
             ", Home: ", home_priority*(0.5*math.cos(desired_heading - state.heading_home)+0.5),
-            ", Exploration: ", explore_priority * (0.5 - 0.5*math.cos(desired_heading - actions_angle[VALUE_OF_EXPLORATION])),
+            ", Exploration: ", explore_priority * (0.5*math.cos(desired_heading - VALUE_OF_EXPLORATION)+ 0.5),
             ", Collision: ", COLLISION_AVOIDANCE_COEFF*(1 - C_eval(desired_heading)))
     }
     
     # Driving code:
     #   Slows down based on the curvature of the path
     error = desired_heading - pose.orientation.yaw
-    var kp = 3
-    set_wheels(base_speed/(math.abs(error)+1) - kp*error, base_speed/(math.abs(error)+1) + kp*error)
+    var kp = 5
+    var kp_slowdown = 0.5
+    set_wheels(base_speed/(math.abs(kp_slowdown*error)+1) - kp*error, base_speed/(math.abs(kp_slowdown*error)+1) + kp*error)
     # log("Error: ", error, " Desired heading: ", desired_heading, " Current heading: ", pose.orientation.yaw)
     
 
@@ -347,7 +348,7 @@ function close_to_wall() {
 # --------------- Remaining functions ---------------
 function C_eval(action) {
 
-    var error = action - pose.orientation.yaw
+    # var error = action - pose.orientation.yaw
     # log("dt=",dt)
     # Calculate our position one timestep later, given action:
     var our_new_pos = { .x=pose.position.x + base_speed * dt * math.cos(action),
@@ -355,22 +356,13 @@ function C_eval(action) {
     # Sum the collision risk per neighbor to find the C_val of this action
     var sum_c = neighbors.reduce(function(rid, data, accumulator) {
         var neighbor_pose = {
-            .x = pose.position.x + data.distance * math.cos(data.elevation) * math.cos(data.azimuth),
-            .y = pose.position.y + data.distance * math.cos(data.elevation) * math.sin(data.azimuth),
-            .z = pose.position.z + data.distance * math.sin(data.elevation)
+            .x = pose.position.x + data.distance/100.0 * math.cos(data.azimuth),
+            .y = pose.position.y + data.distance/100.0 * math.sin(data.azimuth)
         }
-        # log("neighbor=",n)
         return math.exp(-DISTANCE_SENSITIVITY_FACTOR*(calc_dist(our_new_pos, neighbor_pose)-FOOTBOT_SIZE)) + accumulator
     }, 0.0)
     # log("sum_c=", sum_c, ", size(neighbor_list)=", neighbors.count())
     return sum_c / (neighbors.count()+0.001)
-}
-
-function distance(neighbor, action) {
-    # Not entirely sure about the best implementation here
-    # could pull the real position of the robots to get the distance between them?
-    # the real goal is moreso to show how the distance between the two robots will *change* given this action
-    return 0
 }
 
 # Executed when you press the Reset button in the simulation window
