@@ -21,8 +21,6 @@ var FOOTBOT_SIZE = 0.17 # Minimum distance between robots
 var COLLISION_AVOIDANCE_COEFF = 4.
 var DISTANCE_SENSITIVITY_FACTOR = 2.5
 
-# tracking the performance of the swarm
-food_recovered = 0
 
 # generate possible actions array around the circle
 var actions_angle = {}
@@ -40,12 +38,14 @@ function init() {
     approx_home_pos = {.x=0.0, .y=0.0}
     # Table that gets communicated
     state = {
-        .heading_food = 0.0,  # heading to food, calculated to be in the global heading frame
-        .dist_food = 0.0,     
-        .conf_food = 0.0,    # weight of food signal (confidence)
-        .heading_home = 0.0,  # heading to home, calculated to be in the global heading frame
-        .dist_home = 0.0,
-        .conf_home = 0.0    # weight of home signal (confidence)
+        .heading_food = 0.001,  # heading to food, calculated to be in the global heading frame
+        .dist_food = 0.001,     
+        .conf_food = 0.001,    # weight of food signal (confidence)
+        .heading_home = 0.001,  # heading to home, calculated to be in the global heading frame
+        .dist_home = 0.001,
+        .conf_home = 0.001,    # weight of home signal (confidence)
+        # tracking the performance of the swarm
+        .food_recovered = 0
     }   
     
     # Decision making mode
@@ -182,12 +182,12 @@ function step() {
         # Nest found
         if(has_food) {
             has_food = 0
-            food_recovered = food_recovered + 1
-            log("More food delivered to the nest by robot ", id, "! Total: ", food_recovered)
+            state.food_recovered = state.food_recovered + 1
+            log("More food delivered to the nest by robot ", id, "! Total: ", state.food_recovered)
         }
         approx_home_pos = {.x = nest_pair_one.nest.x + math.rng.gaussian(0, TARGET_POS_DEVIATION), 
                            .y = nest_pair_one.nest.y + math.rng.gaussian(0, TARGET_POS_DEVIATION)}
-        state.conf_home = 1
+        state.conf_home = 1.0
     } 
     else if(calc_dist(pose.position, nest_pair_one.food) < nest_pair_one.food.radius*0.8) {
         # Food found
@@ -196,7 +196,7 @@ function step() {
         }
         approx_food_pos = {.x = nest_pair_one.food.x + math.rng.gaussian(0, TARGET_POS_DEVIATION), 
                            .y = nest_pair_one.food.y + math.rng.gaussian(0, TARGET_POS_DEVIATION)}
-        state.conf_food = 1
+        state.conf_food = 1.0
     }
 
     # approx_food_pos

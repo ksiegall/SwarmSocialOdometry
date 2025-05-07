@@ -109,7 +109,7 @@
                   label="socialodometry"
                   outfile="data.dat"
                   tasks="1"
-                  robots="60"
+                  robots="20"
                   commsRange="1"
                   msg_size="300"
                   nest_one_pos_x="1.75"

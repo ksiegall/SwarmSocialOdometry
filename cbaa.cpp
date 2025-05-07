@@ -5,21 +5,9 @@
 #include <map>
 #include <utility>
 
-// static CRange<Real> STIMULUS_RANGE(0.0, 5000.0);
-
 /****************************************/
 /****************************************/
 
-// static void BuzzAssertVector(buzzvm_t t_vm,
-//                              const std::string& str_var) {
-//    buzzobj_t v = BuzzGet(t_vm, str_var);
-//    if(!v) {
-//       THROW_ARGOSEXCEPTION("Robot \"fb" << t_vm->robot << "\" has no variable called \"" << str_var << "\"");
-//    }
-//    if(!buzzobj_istable(v)) {
-//       THROW_ARGOSEXCEPTION("Robot \"fb" << t_vm->robot << "\"'s \"" << str_var << "\" variable should be a table");
-//    }
-// }
 
 // static bool BuzzFetchXij(buzzvm_t t_vm, int j) {
 //    buzzobj_t e = BuzzTableGet(t_vm, j);
@@ -51,6 +39,30 @@
 //    return yij;
 // }
 
+
+static Real BuzzFetch(buzzvm_t t_vm, const std::string& str_key) {
+   buzzobj_t e = BuzzTableGet(t_vm, str_key);
+   if(!e) {
+      THROW_ARGOSEXCEPTION("Robot \"fb" << t_vm->robot << "\"'" << str_key << "' does not exist");
+   }
+   if(!buzzobj_isfloat(e)) {
+      THROW_ARGOSEXCEPTION("Robot \"fb" << t_vm->robot << "\"'" << str_key << "' is not a float, " << typeid(e).name());
+   }
+   return buzzobj_getfloat(e);
+}
+
+static int BuzzFetchInt(buzzvm_t t_vm, const std::string& str_key) {
+   buzzobj_t e = BuzzTableGet(t_vm, str_key);
+   if(!e) {
+      THROW_ARGOSEXCEPTION("Robot \"fb" << t_vm->robot << "\"'" << str_key << "' does not exist");
+   }
+   if(!buzzobj_isint(e)) {
+      THROW_ARGOSEXCEPTION("Robot \"fb" << t_vm->robot << "\"'" << str_key << "' is not an int, " << typeid(e).name());
+   }
+   return buzzobj_getint(e);
+}
+
+
 /**
  * Functor to get data from the robots
  */
@@ -58,6 +70,7 @@ struct GetRobotData : public CBuzzLoopFunctions::COperation {
 
    /** Constructor */
    // GetRobotData(size_t n_tasks) : m_nTasks(n_tasks) {}
+   GetRobotData(size_t n_tasks){}
 
    /*
       THINGS WE NEED HERE:
@@ -76,7 +89,7 @@ struct GetRobotData : public CBuzzLoopFunctions::COperation {
    /** The action happens here */
    virtual void operator()(const std::string& str_robot_id,
                            buzzvm_t t_vm) {
-   }
+   
    //    /* Empty assignment to fill */
    //    SAssignment sAssignment(m_nTasks);
    //    /* Make sure 'xi' and 'yi' exist and are vectors */
@@ -98,9 +111,43 @@ struct GetRobotData : public CBuzzLoopFunctions::COperation {
    //    m_mapAssignments.insert(
    //          std::make_pair(str_robot_id, sAssignment));
    //    }
+
+
+      SAssignment sAssignment(m_nTasks);
+       // Get robot position (x,y)
+       BuzzTableOpen(t_vm, "pose");
+       BuzzTableOpenNested(t_vm, "position");
+         sAssignment.position.Set(
+               BuzzFetch(t_vm, "x"),
+               BuzzFetch(t_vm, "y"));
+      BuzzTableCloseNested(t_vm);
+      BuzzTableClose(t_vm);
+
+      // Get state information
+      BuzzTableOpen(t_vm, "approx_food_pos");
+         sAssignment.state.approx_food.Set(
+               BuzzFetch(t_vm, "x"),
+               BuzzFetch(t_vm, "y"));
+      BuzzTableClose(t_vm);
+      BuzzTableOpen(t_vm, "approx_home_pos");
+         sAssignment.state.approx_home.Set(
+               BuzzFetch(t_vm, "x"),
+               BuzzFetch(t_vm, "y"));
+      BuzzTableClose(t_vm);
+      BuzzTableOpen(t_vm, "state");
+      sAssignment.state.food_confidence = BuzzFetch(t_vm, "conf_food");
+      sAssignment.state.home_confidence = BuzzFetch(t_vm, "conf_home");
+         sAssignment.food_recovered = BuzzFetchInt(t_vm, "food_recovered");   
+      BuzzTableClose(t_vm);
+
+
+      /* Save assignment data */
+      m_mapAssignments.insert(
+            std::make_pair(str_robot_id, sAssignment));
+      }
    
-   //    size_t m_nTasks;
-   //    std::map<std::string, SAssignment> m_mapAssignments;
+      size_t m_nTasks;
+      std::map<std::string, SAssignment> m_mapAssignments;
    };
    
    // /****************************************/
@@ -152,10 +199,10 @@ struct PutSimClock : public CBuzzLoopFunctions::COperation {
 /****************************************/
 /****************************************/
 
+int nRobots;
 void CCBAA::Init(TConfigurationNode& t_tree) {
    /* Parse XML tree */
    GetNodeAttribute(t_tree, "outfile", m_strOutFile);
-   int nRobots;
    GetNodeAttribute(t_tree, "robots", nRobots);
    int nTasks;
    GetNodeAttribute(t_tree, "tasks", nTasks);
@@ -260,15 +307,17 @@ void CCBAA::Reset() {
    BuzzForeachVM(PutTables(nest_pair_one));
    BuzzForeachVM(PutSimClock());
 
-   // /* Reset the output file */
-   // m_cOutFile.open(m_strOutFile.c_str(),
-   //                 std::ofstream::out | std::ofstream::trunc);
-   // m_cOutFile << "ts\trobot";
+   /* Reset the output file */
+   m_cOutFile.open(m_strOutFile.c_str(), std::ofstream::out | std::ofstream::trunc);
+
+   // define the header of the output file
+   m_cOutFile << "ts, robot, x, y, approx_food_x, approx_food_y, food_confidence, approx_home_x, approx_home_y, home_confidence";
+   
    // for(size_t j = 0; j < m_vecTasks.size(); ++j)
    //    m_cOutFile << "\t" << "x_i" << j;
    // for(size_t j = 0; j < m_vecTasks.size(); ++j)
    //    m_cOutFile << "\t" << "y_i" << j;
-   // m_cOutFile << std::endl;
+   m_cOutFile << std::endl;
 }
 
 /****************************************/
@@ -316,25 +365,31 @@ CColor CCBAA::GetFloorColor(const CVector2& c_position_on_plane) {
 
 void CCBAA::PostStep() {
    // /* Get robot data */
-   // GetRobotData cGetRobotData(m_vecTasks.size());
-   // BuzzForeachVM(cGetRobotData);
+   GetRobotData cGetRobotData(nRobots);
+   BuzzForeachVM(cGetRobotData);
+
    /* Write it to the output file */
    /* Go through each robot */
-   // for(auto i = cGetRobotData.m_mapAssignments.begin();
-   //     i != cGetRobotData.m_mapAssignments.end();
-   //     ++i) {
-   //    /* Time step */
-   //    m_cOutFile << GetSpace().GetSimulationClock();
-   //    /* Robot id */
-   //    m_cOutFile << "\t" << i->first;
-   //    /* Values of xi */
-   //    for(size_t j = 0; j < i->second.xi.size(); ++j)
-   //       m_cOutFile << "\t" << i->second.xi[j];
-   //    /* Values of yi */
-   //    for(size_t j = 0; j < i->second.yi.size(); ++j)
-   //       m_cOutFile << "\t" << i->second.yi[j];
-   //    m_cOutFile << std::endl;
-   // }
+   for(auto i = cGetRobotData.m_mapAssignments.begin();
+       i != cGetRobotData.m_mapAssignments.end();
+       ++i) {
+      /* Time step */
+      m_cOutFile << GetSpace().GetSimulationClock();
+      /* Robot id */
+      m_cOutFile << ", " << i->first;
+
+      /* Robot position */
+      m_cOutFile << ", " << i->second.position.GetX() << ", " << i->second.position.GetY();
+
+      /* Robot state */
+      m_cOutFile << ", " << i->second.state.approx_food.GetX() << ", " << i->second.state.approx_food.GetY() << ", " << i->second.state.food_confidence;
+      m_cOutFile << ", " << i->second.state.approx_home.GetX() << ", " << i->second.state.approx_home.GetY() << ", " << i->second.state.home_confidence;
+      
+      /* Food recovered */
+      m_cOutFile << ", " << i->second.food_recovered;
+
+      m_cOutFile << std::endl;
+   }
 }
 
 /****************************************/
