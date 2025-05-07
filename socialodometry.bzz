@@ -38,12 +38,12 @@ function init() {
     approx_home_pos = {.x=0.0, .y=0.0}
     # Table that gets communicated
     state = {
-        .heading_food = 0.001,  # heading to food, calculated to be in the global heading frame
-        .dist_food = 0.001,     
-        .conf_food = 0.001,    # weight of food signal (confidence)
-        .heading_home = 0.001,  # heading to home, calculated to be in the global heading frame
-        .dist_home = 0.001,
-        .conf_home = 0.001,    # weight of home signal (confidence)
+        .heading_food = 0.0,  # heading to food, calculated to be in the global heading frame
+        .dist_food = 0.0,     
+        .conf_food = 0.0,    # weight of food signal (confidence)
+        .heading_home = 0.0,  # heading to home, calculated to be in the global heading frame
+        .dist_home = 0.0,
+        .conf_home = 0.0,    # weight of home signal (confidence)
         # tracking the performance of the swarm
         .food_recovered = 0
     }   
