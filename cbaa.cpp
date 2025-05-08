@@ -311,7 +311,7 @@ void CCBAA::Reset() {
    m_cOutFile.open(m_strOutFile.c_str(), std::ofstream::out | std::ofstream::trunc);
 
    // define the header of the output file
-   m_cOutFile << "ts, robot, x, y, approx_food_x, approx_food_y, food_confidence, approx_home_x, approx_home_y, home_confidence";
+   m_cOutFile << "ts, robot, x, y, approx_food_x, approx_food_y, food_confidence, approx_home_x, approx_home_y, home_confidence, num_food_collected";
    
    // for(size_t j = 0; j < m_vecTasks.size(); ++j)
    //    m_cOutFile << "\t" << "x_i" << j;

@@ -1,16 +1,16 @@
 include "vec2.bzz"
 
 # --------------- Parameters ---------------
-var TARGET_POS_DEVIATION = 0.3
-var SIGNAL_ATTENUATION_RATE = 0.98
+var TARGET_POS_DEVIATION = 0.25
+var SIGNAL_ATTENUATION_RATE = 0.975
 var CONFIDENCE_THRESHOLD = 0.1 # if below this, ignore the signals
-var BETA = 10.0 # used to merge confidence values
+var BETA = 0.1 # used to merge confidence values
 
 # First pair is weights when navigating to food
 # Second pair is weights when navigating to home
 # priorities are: food, home, exploration
 var priorities = { .0 = {.0 = 0.7, .1 = 0.1, .2=0.2}, .1 = {.0=0.1, .1=0.7, .2=0.2} }
-var BIAS_THRESHOLD = 0.25
+var BIAS_THRESHOLD = 0.35
 
 # collision avoidance parameters
 var ANGLE_THRESHOLD = math.pi / 2
@@ -18,7 +18,7 @@ var LENGTH_THRESHOLD = 0.15
 var base_speed = 12
 var FOOTBOT_SIZE = 0.17 # Minimum distance between robots
 
-var COLLISION_AVOIDANCE_COEFF = 4.
+var COLLISION_AVOIDANCE_COEFF = 5.
 var DISTANCE_SENSITIVITY_FACTOR = 2.5
 
 
